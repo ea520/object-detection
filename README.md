@@ -18,7 +18,7 @@ rosdep update
 
 ### Install dependencies and compile
 ```
-git clone https://github.com/ea520/object-detection
+git clone https://github.com/ea520/object-detection && cd object-detection
 ```
 ```bash
 ./install_dependencies.sh
