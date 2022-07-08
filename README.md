@@ -61,5 +61,5 @@ rosrun object_detection with-realsense.sh gpu:=True #rviz:=False
 
 With any luck, you'll see the following screen:
 ![Object detection visualisation](visualisation.png)
-The contents of src/robocup-object-detection-master/object_detection/output.csv
+The contents of src/robocup-object-detection/object_detection/output.csv
 ![Output](output.png)

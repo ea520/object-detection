@@ -17,5 +17,5 @@ echo "Script:" "$(pwd)/install_NEO_OCL_driver.sh"
 sudo -E ./install_NEO_OCL_driver.sh
 cd $install_dir/..
 rm l_openvino_toolkit_p_2022.1.0.643_offline.sh
-cd src/robocup-object-detection-master/object_detection
+cd src/robocup-object-detection/object_detection
 rosdep install --from-paths .
