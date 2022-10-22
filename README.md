@@ -1,6 +1,6 @@
 # Object detection
 ## Install dependencies
-### Install ros (if you haven't already)
+### Install ROS (if you haven't already)
 ```bash
 sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
 sudo apt-get install curl
@@ -40,7 +40,7 @@ rosrun object_detection detect2d.sh --gpu
 
 ### If you have a couple Gb storage:
 Download [this rosbag file](https://drive.google.com/drive/u/1/folders/1Y2u8pNS8XX3paCsEkHHC_YGhx59B44ql) and save it.
-This is a 1 minute recording of the sensor streams
+This is a 1-minute recording of the sensor streams
 
 ```bash
 rosbag decompress recording.bag
@@ -49,7 +49,7 @@ rosbag decompress recording.bag
 rosrun object_detection detect3d.sh rosbag_path:=/full/path/to/recording.bag gpu:=True
 ```
 
-### If you have access to the realsense cameras:
+### If you have access to the RealSense cameras:
 ```bash
 rosrun object_detection with-realsense.sh gpu:=True #rviz:=False
 # add the rviz:=False to just produce the output csv file and don't visualise it.
