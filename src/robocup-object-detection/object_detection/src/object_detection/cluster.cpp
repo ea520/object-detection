@@ -173,7 +173,7 @@ void publish_object_detections_csv(const object_detection::detection_arr &msg)
             if (dets.size() == 0)
                 continue;
             visualization_msgs::Marker points;
-            points.header.frame_id = "/my_frame";
+            points.header.frame_id = "my_frame";
             points.header.stamp = stamp;
             points.ns = detection::classes[i];
             points.action = visualization_msgs::Marker::ADD;
@@ -208,7 +208,7 @@ void publish_object_detections_csv(const object_detection::detection_arr &msg)
         for (size_t i = 0; i < positions.size(); i++)
         {
             visualization_msgs::Marker text_marker;
-            text_marker.header.frame_id = "/my_frame";
+            text_marker.header.frame_id = "my_frame";
             text_marker.header.stamp = stamp;
             text_marker.ns = detection::classes[i];
             text_marker.action = visualization_msgs::Marker::ADD;

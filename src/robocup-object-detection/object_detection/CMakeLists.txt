@@ -28,7 +28,7 @@ find_package(realsense2 CONFIG REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Threads REQUIRED)
 find_package(MLPACK REQUIRED)
-
+find_package(OpenMP REQUIRED)
 message(
   "OPENCV DIR ${OpenCV_DIR}\n"
 )
@@ -67,6 +67,7 @@ target_link_libraries(.detect3d
     realsense2::usb 
     realsense2::realsense2 
     realsense2::realsense-file
+    OpenMP::OpenMP_CXX
 )
 
 add_dependencies(.detect3d object_detection_generate_messages_cpp)
@@ -81,6 +82,7 @@ target_link_libraries(.detect2d
     Threads::Threads 
     zbar
     dbus-1
+    OpenMP::OpenMP_CXX
 )
 add_dependencies(.detect2d object_detection_generate_messages_cpp)
 
@@ -91,6 +93,7 @@ target_link_libraries(.cluster
     ${catkin_LIBRARIES} 
     Threads::Threads 
     ${MLPACK_LIBRARY}
+    OpenMP::OpenMP_CXX
 )
 add_dependencies(.cluster object_detection_generate_messages_cpp)
 
@@ -101,6 +104,7 @@ add_executable(.print_csv src/object_detection/print_csv.cpp)
 target_link_libraries(.print_csv 
     ${catkin_LIBRARIES}
     Threads::Threads 
+    OpenMP::OpenMP_CXX
 )
 add_dependencies(.print_csv object_detection_generate_messages_cpp)
 
@@ -117,5 +121,6 @@ target_link_libraries(.collect
     realsense2::usb 
     realsense2::realsense2 
     realsense2::realsense-file
+    OpenMP::OpenMP_CXX
 )
 add_dependencies(.collect object_detection_generate_messages_cpp)

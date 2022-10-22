@@ -24,7 +24,7 @@
     <depend>zbar</depend>
     <depend>libusb-1.0-dev</depend>
     <depend>libdbus-dev</depend>
-    <depend>python-numpy</depend>
+    <depend>python3-numpy</depend>
 
 
     <exec_depend>message_runtime</exec_depend>
