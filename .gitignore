@@ -2,3 +2,6 @@
 openvino_2022
 devel
 build
+CMakeFiles
+*.bag
+.vscode

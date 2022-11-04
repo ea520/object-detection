@@ -84,7 +84,7 @@ _________________________
 
 
 	<node name="print_csv" pkg="object_detection" type=".print_csv" cwd="node"/>
-	<node name="detect" pkg="object_detection" type=".detect3d" cwd="node" args="_gpu:=$(arg gpu)"/>
+	<node name="detect" pkg="object_detection" type="detect3d" cwd="node" args="_gpu:=$(arg gpu)"/>
 	<node name="cluster" pkg="object_detection" type=".cluster" cwd="node" args="_rviz:=$(arg rviz)"/>
 	<group if="$(arg rviz)">
 		<env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>

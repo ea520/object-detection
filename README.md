@@ -12,7 +12,7 @@ sudo apt-get install ros-$ROS_DISTRO-desktop
 echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> ~/.bashrc
 source /opt/ros/$ROS_DISTRO/setup.bash
 # sudo apt-get install catkin python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential # ubuntu18
-sudo apt install python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential # ubuntu18
+sudo apt install python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential # ubuntu20
 sudo rosdep init
 rosdep update
 ```
@@ -25,7 +25,8 @@ git clone https://github.com/ea520/object-detection && cd object-detection
 ./install_dependencies.sh
 ```
 ```bash
-./compile.sh -DCMAKE_BUILD_TYPE=RELEASE
+source ~/intel/openvino_2022/setupvars.sh 
+catkin_make -DCMAKE_BUILD_TYPE=RELEASE
 ```
 
 ## Run the code
@@ -35,7 +36,7 @@ git clone https://github.com/ea520/object-detection && cd object-detection
 source ./devel/setup.bash
 ```
 ```bash
-rosrun object_detection detect2d.sh --gpu
+rosrun object_detection detect2d --gpu
 ```
 
 ### If you have a couple Gb storage:
@@ -46,7 +47,7 @@ This is a 1-minute recording of the sensor streams
 rosbag decompress recording.bag
 ```
 ```bash
-rosrun object_detection detect3d.sh rosbag_path:=/full/path/to/recording.bag gpu:=True
+roslaunch object_detection detect_objects.launch rosbag_path:=/full/path/to/recording.bag gpu:=True
 ```
 
 ### If you have access to the RealSense cameras:
