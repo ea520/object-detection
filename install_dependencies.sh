@@ -1,10 +1,11 @@
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]-$0}" )" >/dev/null 2>&1 && pwd )"
 OPENVINODIR=~/intel/
 SETUPVARS=~/intel/openvino_2022/setupvars.sh
 OPENCV_INSTALL_DIR=~/.local/opencv4-openvino
 
 ask_for_opencv_install(){
 	while true; do
-	echo "Attempting to compile OpenCV with OpenVINO and install it to $OPENCV_INSTALL_DIR."
+	echo "Attempting to compile OpenCV with iGPU support and install it to $OPENCV_INSTALL_DIR"
 	read -p "Do you want to proceed? (y/n) " yn
 
 	case $yn in 
@@ -20,7 +21,7 @@ ask_for_opencv_install(){
 
 ask_for_openvino_install(){
 	while true; do
-	echo "Attempting to install OpenVINO and install it to $OPENVINODIR."
+	echo "Attempting to install OpenVINO and install it to $OPENVINODIR"
 	read -p "Do you want to proceed? (y/n) " yn
 
 	case $yn in 
@@ -42,16 +43,19 @@ install_openvino(){
 	wget https://storage.openvinotoolkit.org/repositories/openvino/packages/2022.2/linux/l_openvino_toolkit_ubuntu20_2022.2.0.7713.af16ea1d79a_x86_64.tgz --no-check-certificate
 	file="$(ls)"
 	wget https://storage.openvinotoolkit.org/repositories/openvino/packages/2022.2/linux/l_openvino_toolkit_ubuntu20_2022.2.0.7713.af16ea1d79a_x86_64.tgz.sha256 --no-check-certificate
-	sha256sum -с $file.sha256
+	sha256sum -c $file.sha256
 	mkdir -p ~/intel/
-	rm -rf *
+	rm -rf ~/intel/*
 	tar xf $file -C ~/intel/
 	cd ~/intel/
 	extracted_folder="$(ls)"
 	ln -s $extracted_folder openvino_2022
 	cd openvino_2022/install_dependencies/
+	echo "Attempting to install the opencl drivers with the following command:"
 	echo "sudo -E $(pwd)/install_NEO_OCL_driver.sh"
 	sudo -E ./install_NEO_OCL_driver.sh
+	cd $SCRIPT_DIR
+	echo "source $SETUPVARS" >> setupvars.bash
 }
 
 install_opencv(){
@@ -79,7 +83,8 @@ install_opencv(){
 	libva-dev \
 	libmfx-dev \
 	libgstreamer1.0-dev \
-	libgstreamer-plugins-base1.0-dev
+	libgstreamer-plugins-base1.0-dev \
+	nasm
 
 	source $SETUPVARS
 	
@@ -151,11 +156,8 @@ install_opencv(){
 	-D OPENCV_INSTALL_FFMPEG_DOWNLOAD_SCRIPT=ON \
 	-D BUILD_opencv_world=OFF \
 	-D BUILD_opencv_python2=OFF \
-	-D BUILD_opencv_python3=ON \
-	-D PYTHON3_PACKAGES_PATH=install/python/python3 \
-	-D PYTHON3_LIMITED_API=ON \
+	-D BUILD_opencv_python3=OFF \
 	-D HIGHGUI_PLUGIN_LIST=all \
-	-D OPENCV_PYTHON_INSTALL_PATH=python \
 	-D CPU_BASELINE=SSE4_2 \
 	-D OPENCV_IPP_GAUSSIAN_BLUR=ON \
 	-D WITH_OPENVINO=ON \
@@ -181,5 +183,6 @@ else
 	echo "Found OpenCV!"
 fi
 
-cd src/robocup-object-detection/object_detection
+echo "#!/bin/bash" > setupvars.bash
+echo "source $SETUPVARS" >> setupvars.bash
 rosdep install --from-paths .

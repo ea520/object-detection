@@ -5,3 +5,6 @@ build
 CMakeFiles
 *.bag
 .vscode
+setupvars.bash
+TODO.md
+output.csv

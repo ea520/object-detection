@@ -88,7 +88,7 @@ _________________________
 	<node name="cluster" pkg="object_detection" type=".cluster" cwd="node" args="_rviz:=$(arg rviz)"/>
 	<group if="$(arg rviz)">
 		<env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
-		<node name="visualiser" pkg="rviz" type="rviz" args="-d $(dirname)/settings.rviz" required="true"/>
+		<node name="visualiser" pkg="rviz" type="rviz" args="-d $(find object_detection)/../../resources/settings.rviz" required="true"/>
 	</group>
 
 

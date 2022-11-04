@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-catkin_add_env_hooks("setupvars" SHELLS bash DIRECTORY "${CMAKE_SOURCE_DIR}/env-hooks")
+catkin_add_env_hooks("setupvars" SHELLS bash DIRECTORY "${CMAKE_SOURCE_DIR}/../")
 
 project(object_detection)
 
@@ -55,10 +55,10 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${MLPACK_INCLUDE_DIRS}
-  src/common/
+  src/
 )
 
-add_executable(detect3d src/object_detection/detect3d.cpp src/common/yolo.cpp src/common/util.cpp)
+add_executable(detect3d src/detect3d.cpp src/yolo.cpp src/util.cpp)
 
 target_link_libraries(detect3d
     ${catkin_LIBRARIES} 
@@ -77,7 +77,7 @@ add_dependencies(detect3d object_detection_generate_messages_cpp)
 
 
 
-add_executable(detect2d src/object_detection/detect2d.cpp src/common/yolo.cpp)
+add_executable(detect2d src/detect2d.cpp src/yolo.cpp src/util.cpp)
 
 target_link_libraries(detect2d
     ${catkin_LIBRARIES} 
@@ -90,7 +90,7 @@ target_link_libraries(detect2d
 add_dependencies(detect2d object_detection_generate_messages_cpp)
 
 # the cluster executable
-add_executable(.cluster src/object_detection/cluster.cpp)
+add_executable(.cluster src/cluster.cpp)
 
 target_link_libraries(.cluster 
     ${catkin_LIBRARIES} 
@@ -102,7 +102,7 @@ add_dependencies(.cluster object_detection_generate_messages_cpp)
 
 
 
-add_executable(.print_csv src/object_detection/print_csv.cpp)
+add_executable(.print_csv src/print_csv.cpp)
 
 target_link_libraries(.print_csv 
     ${catkin_LIBRARIES}
@@ -110,20 +110,3 @@ target_link_libraries(.print_csv
     OpenMP::OpenMP_CXX
 )
 add_dependencies(.print_csv object_detection_generate_messages_cpp)
-
-
-add_executable(.collect src/depth_calibration/collect_raw_data.cpp src/common/yolo.cpp src/common/util.cpp)
-
-target_link_libraries(.collect
-    ${catkin_LIBRARIES} 
-    ${OpenCV_LIBS} 
-    Threads::Threads 
-    zbar
-    dbus-1
-    realsense2::fw 
-    realsense2::usb 
-    realsense2::realsense2 
-    realsense2::realsense-file
-    OpenMP::OpenMP_CXX
-)
-add_dependencies(.collect object_detection_generate_messages_cpp)

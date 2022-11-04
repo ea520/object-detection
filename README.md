@@ -25,7 +25,7 @@ git clone https://github.com/ea520/object-detection && cd object-detection
 ./install_dependencies.sh
 ```
 ```bash
-source ~/intel/openvino_2022/setupvars.sh 
+source setupvars.bash 
 catkin_make -DCMAKE_BUILD_TYPE=RELEASE
 ```
 
@@ -34,9 +34,9 @@ catkin_make -DCMAKE_BUILD_TYPE=RELEASE
 ### If you have a camera, you can check the object detection/QR code viewer
 ```bash
 source ./devel/setup.bash
-```
-```bash
-rosrun object_detection detect2d --gpu
+WEIGHTS=./resources
+rosrun object_detection detect2d --source 0 --target-fps 10 --conf-thres 0.8 --GPU --bin $WEIGHTS/best.bin --xml $WEIGHTS/best.xml --classes  $WEIGHTS/classes.txt --no-qr --output-path path/to/save/video
+# "./detect.sh --help" will show the command line options
 ```
 
 ### If you have a couple Gb storage:
@@ -52,13 +52,15 @@ roslaunch object_detection detect_objects.launch rosbag_path:=/full/path/to/reco
 
 ### If you have access to the RealSense cameras:
 ```bash
-rosrun object_detection with-realsense.sh gpu:=True #rviz:=False
+roslaunch object_detection detect_objects.launch  gpu:=True #rviz:=False
 # add the rviz:=False to just produce the output csv file and don't visualise it.
 # positions in the file are relative to the tracking camera's coordinate system
 # you can include the arguments to rs_d400_and_t265.launch here as well
 ```
 
 With any luck, you'll see the following screen:
-![Object detection visualisation](visualisation.png)
-The contents of src/robocup-object-detection/object_detection/output.csv
-![Output](output.png)
+
+![Object detection visualisation](resources/visualisation.png)
+The contents of src/robocup-object-detection/object_detection/output.csv:
+
+![Output](resources/output.png)

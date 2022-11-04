@@ -20,22 +20,21 @@
 #include <mutex>
 #include <object_detection/string_arr.h>
 #include <object_detection/detection_arr.h>
-#include "yolo.h"
-#include "util.h"
-#include "vec3d.h"
+#include "yolo.hpp"
+#include "util.hpp"
 #include <message_filters/sync_policies/approximate_time.h>
 
 rs2_intrinsics intrinsics;
 bool show_boxes = true;
 
-cv::dnn::Net net;
+yolo::yolo_net net;
 zbar::ImageScanner scanner;
 image_transport::Publisher colour_pub;
 ros::Publisher detection_pub, qr_pub;
 
 util::average_smoothing_t average_smoothing;
-yolo::Rate rate(100);
-util::CPU_timer cpu_timer;
+util::Rate rate(100 * 1000);
+util::cpu_timer_t cpu_timer;
 const matrix3d depth_camera_rotation = {
     {0.0016619, 0.07326312, 0.99731126},
     {-0.99975752, -0.0217769, 0.00326572},
@@ -57,7 +56,7 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
 
     auto detect_yolo = [&]()
     {
-        output = yolo::detect(frame, net);
+        output = net.detect(frame);
     };
     auto detect_qr = [&]()
     { scanner.scan(image); };
@@ -139,21 +138,16 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
     int detections = output.size();
 
     // get depth image
-
+    if (show_boxes)
+    {
+        yolo::draw_boxes(output, frame, net);
+    }
     for (int i = 0; i < detections; ++i)
     {
 
         auto detection = output[i];
         auto box = detection.box;
         auto classId = detection.class_id;
-        const auto color = yolo::colors[classId];
-
-        if (show_boxes)
-        {
-            cv::rectangle(frame, box, color, 3);
-            cv::rectangle(frame, cv::Point(box.x, box.y - 10), cv::Point(box.x + box.width, box.y), color, cv::FILLED);
-            cv::putText(frame, yolo::class_list[classId].c_str(), cv::Point(box.x, box.y), cv::FONT_HERSHEY_PLAIN, 1.0, cv::Scalar(0, 0, 0));
-        }
 
         if (box.x == 0 || box.y == 0 || box.x + box.width == frame.cols || box.y + box.height == frame.rows)
             continue;
@@ -171,28 +165,23 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
         d.type = classId;
         out_msg.data.push_back(d);
     }
+    if (out_msg.data.size())
+        detection_pub.publish(out_msg);
     if (show_boxes)
     {
 
         cv::copyMakeBorder(frame, frame, 40, 0, 0, 0, cv::BORDER_CONSTANT, {0, 0, 0});
-        cpu_timer.update();
-        double cpu_usage = cpu_timer.get_usage();
-        int integer_usage = cpu_usage;
-        int tens = 10 * (cpu_usage - integer_usage);
-        cv::putText(frame, std::string("CPU ") + std::to_string(integer_usage) + "." + std::to_string(tens) + "%", {10, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7, {100, 200, 0}, 1);
-
-        cv::putText(frame, std::string("Target FPS: ") + std::to_string(1000 / rate.ms.count()), {190, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7,
-                    rate.overspent() ? cv::Scalar{50, 50, 200} : cv::Scalar{100, 200, 0}, 1);
+        int usage = cpu_timer.getCPUPercentage();
+        cv::putText(frame, std::string("CPU ") + std::to_string(usage) + "%", {10, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7, {100, 200, 0}, 1);
 
         cv::putText(frame,
                     std::string("Inference time: ") + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(average_smoothing.get()).count()) + "ms",
                     {390, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7, {100, 200, 0}, 1);
+        cv::putText(frame, std::string("Target FPS: ") + std::to_string(1'000'000 / rate.get_target().count()), {190, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7,
+                    rate.wait() ? cv::Scalar{50, 50, 200} : cv::Scalar{100, 200, 0}, 1);
         sensor_msgs::Image colour_msg = util::toImageMsg(frame);
         colour_pub.publish(colour_msg);
     }
-    if (out_msg.data.size())
-        detection_pub.publish(out_msg);
-    rate.pause();
 }
 
 int main(int argc, char **argv)
@@ -232,7 +221,13 @@ int main(int argc, char **argv)
     message_filters::Synchronizer<sync_type> sync(sync_type(10), colour_sub, depth_sub, gyro_sub);
 
     sync.registerCallback(boost::bind(&camera_callback, _1, _2, _3));
-    yolo::load_net(net, !GPU);
+    std::string path = ros::package::getPath("object_detection") + "/../../resources/";
+    std::string bin_path{path + "best.bin"}, xml_path{path + "best.xml"};
+    std::string txt_path = ros::package::getPath("object_detection") + "classes.txt";
+    std::cerr << "BIN PATH: " << bin_path << std::endl;
+
+    int target = GPU ? cv::dnn::DNN_TARGET_OPENCL_FP16 : cv::dnn::DNN_TARGET_CPU;
+    net = yolo::yolo_net(bin_path, xml_path, txt_path, target, 0.8);
     if (show_boxes)
     {
         image_transport::ImageTransport it(nh);

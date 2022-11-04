@@ -1,4 +1,9 @@
-#include "util.h"
+#include "util.hpp"
+#include "stdlib.h"
+#include "stdio.h"
+#include "string.h"
+#include "sys/times.h"
+#include "sys/vtimes.h"
 namespace util
 {
     sensor_msgs::Image toImageMsg(const cv::Mat &image)
@@ -53,5 +58,44 @@ namespace util
         if (img->encoding == "rgb8")
             cv::cvtColor(output, output, cv::COLOR_RGB2BGR);
         return output;
+    }
+
+    cpu_timer_t::cpu_timer_t()
+    {
+        FILE *file;
+        struct tms timeSample;
+
+        lastCPU = times(&timeSample);
+        lastSysCPU = timeSample.tms_stime;
+        lastUserCPU = timeSample.tms_utime;
+
+        file = fopen("/proc/cpuinfo", "r");
+        fclose(file);
+    }
+    int cpu_timer_t::getCPUPercentage()
+    {
+        struct tms timeSample;
+        clock_t now;
+        double percent;
+
+        now = times(&timeSample);
+        if (now <= lastCPU || timeSample.tms_stime < lastSysCPU ||
+            timeSample.tms_utime < lastUserCPU)
+        {
+            // Overflow detection. Just skip this value.
+            percent = -1.0;
+        }
+        else
+        {
+            percent = (timeSample.tms_stime - lastSysCPU) +
+                      (timeSample.tms_utime - lastUserCPU);
+            percent /= (now - lastCPU);
+            percent *= 100;
+        }
+        lastCPU = now;
+        lastSysCPU = timeSample.tms_stime;
+        lastUserCPU = timeSample.tms_utime;
+
+        return (int)percent;
     }
 }
