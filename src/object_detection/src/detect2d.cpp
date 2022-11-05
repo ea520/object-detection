@@ -10,9 +10,9 @@
 #include <opencv2/core/utils/logger.hpp>
 #include <zbar.h>
 #include <thread>
-#include <yolo.hpp>
-#include <util.hpp>
-#include <argparse.hpp>
+#include "yolo.hpp"
+#include "util.hpp"
+#include "argparse.hpp"
 #include <filesystem>
 #include <algorithm>
 

@@ -36,7 +36,7 @@ catkin_make -DCMAKE_BUILD_TYPE=RELEASE
 source ./devel/setup.bash
 WEIGHTS=./resources
 rosrun object_detection detect2d --source 0 --target-fps 10 --conf-thres 0.8 --GPU --bin $WEIGHTS/best.bin --xml $WEIGHTS/best.xml --classes  $WEIGHTS/classes.txt --no-qr --output-path path/to/save/video
-# "./detect.sh --help" will show the command line options
+# "rosrun object_detection detect2d --help" will show the command line options
 ```
 
 ### If you have a couple Gb storage:
