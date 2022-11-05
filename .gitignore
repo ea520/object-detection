@@ -8,4 +8,4 @@ CMakeFiles
 setupvars.bash
 TODO.md
 output.csv
-./src/CMakeLists.txt
+/src/CMakeLists.txt
