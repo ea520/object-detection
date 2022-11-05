@@ -61,6 +61,6 @@ roslaunch object_detection detect_objects.launch  gpu:=True #rviz:=False
 With any luck, you'll see the following screen:
 
 ![Object detection visualisation](resources/visualisation.png)
-The contents of src/robocup-object-detection/object_detection/output.csv:
+The contents of src/object_detection/output.csv:
 
 ![Output](resources/output.png)
