@@ -37,7 +37,8 @@ namespace util
         }
         return ros_image;
     }
-
+    // convert an encoding string to its opencv equivalent number
+    // only supports rgb8, bgr8 and 16UC1
     int toCVEncoding(const std::string &encoding)
     {
         if (encoding == "bgr8")
@@ -60,6 +61,13 @@ namespace util
         return output;
     }
 
+    bool Rate::wait()
+    {
+        using namespace std::chrono;
+        auto wait_time = t0 + us - high_resolution_clock::now();
+        std::this_thread::sleep_for(wait_time);
+        return wait_time > 0ns;
+    }
     cpu_timer_t::cpu_timer_t()
     {
         FILE *file;

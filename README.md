@@ -12,7 +12,7 @@ sudo apt-get install ros-$ROS_DISTRO-desktop
 echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> ~/.bashrc
 source /opt/ros/$ROS_DISTRO/setup.bash
 # sudo apt-get install catkin python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential # ubuntu18
-sudo apt install python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential # ubuntu20
+sudo apt install python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential python3-catkin # ubuntu20
 sudo rosdep init
 rosdep update
 ```
@@ -23,6 +23,7 @@ git clone https://github.com/ea520/object-detection && cd object-detection
 ```
 ```bash
 ./install_dependencies.sh
+rm ./install_dependencies.sh # you can now remove the file if the install was successful
 ```
 ```bash
 source setupvars.bash 
@@ -60,7 +61,7 @@ roslaunch object_detection detect_objects.launch  gpu:=True #rviz:=False
 
 With any luck, you'll see the following screen:
 
-![Object detection visualisation](resources/visualisation.png)
+![Object detection visualization](resources/visualisation.png)
 The contents of src/object_detection/output.csv:
 
 ![Output](resources/output.png)

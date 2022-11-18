@@ -1,8 +1,8 @@
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]-$0}" )" >/dev/null 2>&1 && pwd )"
-OPENVINODIR=~/intel/
+THIS_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]-$0}" )" >/dev/null 2>&1 && pwd )"
+OPENVINO_INSTALL_DIR=~/intel
 SETUPVARS=~/intel/openvino_2022/setupvars.sh
-OPENCV_INSTALL_DIR=~/.local/opencv4-openvino
-
+OPENCV_INSTALL_DIR=~/.local/openvino-opencv4
+OPENCV_COMPILE_DIR=~/.local/src
 ask_for_opencv_install(){
 	while true; do
 	echo "Attempting to compile OpenCV with iGPU support and install it to $OPENCV_INSTALL_DIR"
@@ -21,7 +21,7 @@ ask_for_opencv_install(){
 
 ask_for_openvino_install(){
 	while true; do
-	echo "Attempting to install OpenVINO and install it to $OPENVINODIR"
+	echo "Attempting to install OpenVINO and install it to $OPENVINO_INSTALL_DIR"
 	read -p "Do you want to proceed? (y/n) " yn
 
 	case $yn in 
@@ -54,7 +54,7 @@ install_openvino(){
 	echo "Attempting to install the opencl drivers with the following command:"
 	echo "sudo -E $(pwd)/install_NEO_OCL_driver.sh"
 	sudo -E ./install_NEO_OCL_driver.sh
-	cd $SCRIPT_DIR
+	cd $THIS_SCRIPT_DIR
 	echo "source $SETUPVARS" >> setupvars.bash
 }
 
@@ -88,12 +88,14 @@ install_opencv(){
 
 	source $SETUPVARS
 	
-	cd /tmp/
-	mkdir -p opencv4 && cd opencv4
+	mkdir -p $OPENCV_COMPILE_DIR/opencv4
+	cd $OPENCV_COMPILE_DIR/opencv4
 	rm -rf *
 	
 	git clone --recurse-submodules https://github.com/opencv/opencv.git
-	mkdir build-opencv && cd build-opencv
+	cd opencv
+	mkdir build-opencv
+	cd build-opencv
 	cmake \
 	-D BUILD_INFO_SKIP_EXTRA_MODULES=ON \
 	-D BUILD_EXAMPLES=OFF \
@@ -114,7 +116,8 @@ install_opencv(){
 	-D WITH_GPHOTO2=OFF \
 	-D WITH_GSTREAMER=ON \
 	-D OPENCV_GAPI_GSTREAMER=OFF \
-	-D WITH_GTK_2_X=OFF \
+	-D WITH_QT=OFF \
+	-D WITH_GTK=ON \
 	-D WITH_IPP=ON \
 	-D WITH_JASPER=OFF \
 	-D WITH_LAPACK=OFF \
@@ -163,7 +166,7 @@ install_opencv(){
 	-D WITH_OPENVINO=ON \
 	-D VIDEOIO_PLUGIN_LIST=ffmpeg,gstreamer,mfx \
 	-D CMAKE_EXE_LINKER_FLAGS=-Wl,--allow-shlib-undefined \
-	-D CMAKE_BUILD_TYPE=Release ../opencv/
+	-D CMAKE_BUILD_TYPE=Release ..
 	cmake --build . -j8
 	cmake --install . --prefix $OPENCV_INSTALL_DIR
 	echo "export OpenCV_DIR=$OPENCV_INSTALL_DIR/cmake" >> $SETUPVARS
@@ -171,7 +174,7 @@ install_opencv(){
 }
 
 if [ -f "$SETUPVARS" ]; then
-	echo "Found OpenVino!"
+	echo "Found OpenVino! (delete $SETUPVARS if you want to re-install openvino)"
 else
 	install_openvino 
 fi
@@ -180,9 +183,11 @@ source "$SETUPVARS" >> /dev/null
 if [ -z "$OpenCV_DIR" ]; then 
 	install_opencv
 else
-	echo "Found OpenCV!"
+	echo "Found OpenCV! (delete $SETUPVARS if you want to re-install opencv)"
 fi
 
 echo "#!/bin/bash" > setupvars.bash
 echo "source $SETUPVARS" >> setupvars.bash
+chmod +x setupvars.bash
+cd $THIS_SCRIPT_DIR
 rosdep install --from-paths .

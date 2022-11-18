@@ -32,8 +32,9 @@ zbar::ImageScanner scanner;
 image_transport::Publisher colour_pub;
 ros::Publisher detection_pub, qr_pub;
 
-util::average_smoothing_t average_smoothing;
-util::Rate rate(100 * 1000);
+util::circular_buffer<short, 20> inference_times;
+util::circular_buffer<short, 100> cpu_times;
+util::Rate rate(std::chrono::milliseconds(100));
 util::cpu_timer_t cpu_timer;
 const matrix3d depth_camera_rotation = {
     {0.0016619, 0.07326312, 0.99731126},
@@ -68,7 +69,8 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
         t1.join();
         t2.join();
     }
-    average_smoothing.update(inference_time);
+    using namespace std::chrono;
+    inference_times.add_value(duration_cast<milliseconds>(inference_time).count());
     object_detection::detection_arr out_msg;
 
     auto get_world_point = [&](float x, float y) -> vec3d
@@ -76,7 +78,6 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
         float depth = (float)depth_frame.at<u_int16_t>((int)y, (int)x);
         if (depth < 10 || depth > 3000) // only sensitive to a certain depth range
             return vec3d{0., 0., 0.};
-        std::cout << depth * 1e-3 << std::endl;
         float camera_point[3], pixel[] = {x, y};
         rs2_deproject_pixel_to_point(camera_point, &intrinsics, pixel, depth * 1e-3); // depth in m
         vec3d camera_point_vec(camera_point);
@@ -171,11 +172,11 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
     {
 
         cv::copyMakeBorder(frame, frame, 40, 0, 0, 0, cv::BORDER_CONSTANT, {0, 0, 0});
-        int usage = cpu_timer.getCPUPercentage();
-        cv::putText(frame, std::string("CPU ") + std::to_string(usage) + "%", {10, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7, {100, 200, 0}, 1);
+        cpu_times.add_value(cpu_timer.getCPUPercentage());
+        cv::putText(frame, std::string("CPU ") + std::to_string(cpu_times.get_average()) + "%", {10, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7, {100, 200, 0}, 1);
 
         cv::putText(frame,
-                    std::string("Inference time: ") + std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(average_smoothing.get()).count()) + "ms",
+                    std::string("Inference time: ") + std::to_string(inference_times.get_average()) + "ms",
                     {390, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7, {100, 200, 0}, 1);
         cv::putText(frame, std::string("Target FPS: ") + std::to_string(1'000'000 / rate.get_target().count()), {190, 30}, cv::FONT_HERSHEY_DUPLEX, 0.7,
                     rate.wait() ? cv::Scalar{50, 50, 200} : cv::Scalar{100, 200, 0}, 1);
@@ -224,10 +225,12 @@ int main(int argc, char **argv)
     std::string path = ros::package::getPath("object_detection") + "/../../resources/";
     std::string bin_path{path + "best.bin"}, xml_path{path + "best.xml"};
     std::string txt_path = ros::package::getPath("object_detection") + "classes.txt";
-    std::cerr << "BIN PATH: " << bin_path << std::endl;
+    std::cout << "BIN PATH: " << bin_path << std::endl;
 
     int target = GPU ? cv::dnn::DNN_TARGET_OPENCL_FP16 : cv::dnn::DNN_TARGET_CPU;
+
     net = yolo::yolo_net(bin_path, xml_path, txt_path, target, 0.8);
+
     if (show_boxes)
     {
         image_transport::ImageTransport it(nh);

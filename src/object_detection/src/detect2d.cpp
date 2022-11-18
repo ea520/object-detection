@@ -1,11 +1,3 @@
-/*
-    Run YOLO detection inference on videos
-
-    Usage:
-        $ ./detect --bin weights.bin --xml weights.xml --classes /path/to/classes.txt --conf-thres 0.7 --source 0                                       # webcam
-                                                                                                                path/to/vid.mp4                         # video
-                                                                                                                *.mp4                                   # videos
-*/
 #include <opencv2/opencv.hpp>
 #include <opencv2/core/utils/logger.hpp>
 #include <zbar.h>
@@ -24,8 +16,8 @@
 
 constexpr int slider_max = 100;
 constexpr int bordersize = 32;
-util::rotating_buffer<int16_t, 25> frame_times;
-util::rotating_buffer<int16_t, 25> cpu_percentages;
+util::circular_buffer<int16_t, 25> frame_times;
+util::circular_buffer<int16_t, 25> cpu_percentages;
 
 static void on_trackbar(int slider_value, void *data)
 {
@@ -93,10 +85,6 @@ int main(int argc, const char **argv)
         .help("Whether to perform the object detection")
         .implicit_value(true)
         .default_value(false);
-
-    // program.add_argument("--output-layer-name")
-    //     .help("Currently does nothing")
-    //     .default_value(std::string(""));
 
     try
     {

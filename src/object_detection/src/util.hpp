@@ -6,76 +6,67 @@
 
 namespace util
 {
-    // convert an CV image to to a ros image message
+
+    /// @brief Convert OpenCV image to to a ROS image message
+    /// @param image
+    /// @return the image as ROS format
     sensor_msgs::Image toImageMsg(const cv::Mat &image);
 
-    // convert an encoding string to its opencv equivalent number
-    // only supports rgb8, bgr8 and 16UC1
-    int toCVEncoding(const std::string &encoding);
-
     // convert a ros immage message to an opencv image
+
+    /// @brief Convert a ROS image message to an OpenCV image
+    /// @param img
+    /// @return
     cv::Mat toCVMat(const sensor_msgs::ImageConstPtr &img);
 
-    // For checking CPU usage
+    /// @brief Struct for finding the CPU usage of the current programme
     struct cpu_timer_t
     {
         cpu_timer_t();
+        /// @brief Get the CPU usage as a percentage (maximum of 100% * #threads)
+        /// @return The CPU usage as a percentage
         int getCPUPercentage();
 
     private:
         clock_t lastCPU, lastSysCPU, lastUserCPU;
     };
-
+    /// @brief Struct for pausing code for a certain time
     struct Rate
     {
-        Rate(unsigned us) : us(us), t0(std::chrono::high_resolution_clock::now()) {}
-        bool wait()
-        {
-            using namespace std::chrono;
-            auto wait_time = t0 + us - high_resolution_clock::now();
-            std::this_thread::sleep_for(wait_time);
-            return wait_time > 0ns;
-        }
+        /// @brief Constructor
+        /// @param us The time in microseconds between the when the constructor is called and when functin `wait` returns
+        Rate(std::chrono::microseconds us) : us(us), t0(std::chrono::high_resolution_clock::now()) {}
+        /// @brief Get the time in microseconds given in the constructor
+        /// @return
         std::chrono::microseconds get_target() const { return us; }
+        /// @brief Pause execution for the remaining time if there is any time left
+        /// @return Whether there was any time remaining
+        bool wait();
 
     private:
         std::chrono::microseconds us;
         std::chrono::high_resolution_clock::time_point t0;
     };
+    /// @brief Struct for timing how long until its destructor is called
     struct scope_timer
     {
+        /// @brief Constructor
+        /// @param output A variable to save the time it took for the desturctor to be called
         scope_timer(std::chrono::high_resolution_clock::duration *output) : t0(std::chrono::high_resolution_clock::now()), output(output) {}
-        ~scope_timer()
-        {
-            *output = std::chrono::high_resolution_clock::now() - t0;
-        }
+        ~scope_timer() { *output = std::chrono::high_resolution_clock::now() - t0; }
+
+    private:
         std::chrono::high_resolution_clock::time_point t0;
         std::chrono::high_resolution_clock::duration *output;
     };
-
-    // Every smoothes the frame times
-    struct average_smoothing_t
-    {
-        void update(std::chrono::high_resolution_clock::duration dt)
-        {
-            cumulative_time += dt;
-            counter++;
-            if (cumulative_time > averaging_period)
-            {
-                smoothed = cumulative_time / counter;
-                counter = 0;
-                cumulative_time = std::chrono::milliseconds(0);
-            }
-        };
-        std::chrono::high_resolution_clock::duration get() const { return smoothed; };
-        std::chrono::high_resolution_clock::duration cumulative_time = std::chrono::milliseconds(0);
-        std::chrono::high_resolution_clock::duration smoothed = std::chrono::milliseconds(0);
-        int counter;
-        constexpr static std::chrono::high_resolution_clock::duration averaging_period = std::chrono::milliseconds(500);
-    };
+    /// @brief Struct for a circular buffer: When the buffer is full, the oldest entry gets removed.
+    /// @tparam T The integer type of the buffer (char, long, unsigned etc.)
+    /// @tparam N The maximum size of the buffer
     template <typename T, int N>
-    struct rotating_buffer
+    struct circular_buffer
     {
+        /// @brief Add a value to the buffer (if the buffer is full, also remove the earliest value)
+        /// @param value
         void add_value(T value)
         {
             arr[position++] = value;
@@ -85,6 +76,8 @@ namespace util
                 full = true;
             }
         }
+        /// @brief Get the average value of the elements in the buffer
+        /// @return The average
         T get_average()
         {
             long long sum = 0;
@@ -113,50 +106,12 @@ namespace util
     };
 }
 
+/// @brief Basic 3D vector operations
 struct vec3d
 {
-    constexpr vec3d(double x = 0., double y = 0., double z = 0.) : x(x), y(y), z(z)
-    {
-    }
-    explicit constexpr vec3d(const geometry_msgs::Point &p) : x(p.x), y(p.y), z(p.z)
-    {
-    }
-    explicit constexpr vec3d(float p[3]) : x(p[0]), y(p[1]), z(p[2])
-    {
-    }
-
-    constexpr vec3d operator+(const vec3d &v) const
-    {
-        return vec3d{x + v.x, y + v.y, z + v.z};
-    }
-    void operator+=(const vec3d &v)
-    {
-        x += v.x;
-        y += v.y;
-        z += v.z;
-    }
-    constexpr vec3d operator+() const
-    {
-        return *this;
-    }
-    constexpr vec3d operator-(const vec3d &v) const
-    {
-        return vec3d{x - v.x, y - v.y, z - v.z};
-    }
-    constexpr vec3d operator-() const
-    {
-        return vec3d{-x, -y, -z};
-    }
-
-    constexpr vec3d operator*(double a) const
-    {
-        return vec3d{a * x, a * y, a * z};
-    }
-
-    constexpr double dot(const vec3d &v) const
-    {
-        return x * v.x + y * v.y + z * v.z;
-    }
+    constexpr vec3d(double x = 0., double y = 0., double z = 0.) : x(x), y(y), z(z) {}
+    explicit constexpr vec3d(const geometry_msgs::Point &p) : x(p.x), y(p.y), z(p.z) {}
+    explicit constexpr vec3d(float p[3]) : x(p[0]), y(p[1]), z(p[2]) {}
     explicit operator geometry_msgs::Point() const
     {
         geometry_msgs::Point p;
@@ -165,6 +120,19 @@ struct vec3d
         p.z = z;
         return p;
     }
+
+    constexpr vec3d operator+(const vec3d &v) const { return vec3d{x + v.x, y + v.y, z + v.z}; }
+    void operator+=(const vec3d &v)
+    {
+        x += v.x;
+        y += v.y;
+        z += v.z;
+    }
+    constexpr vec3d operator+() const { return *this; }
+    constexpr vec3d operator-(const vec3d &v) const { return vec3d{x - v.x, y - v.y, z - v.z}; }
+    constexpr vec3d operator-() const { return vec3d{-x, -y, -z}; }
+    constexpr vec3d operator*(double a) const { return vec3d{a * x, a * y, a * z}; }
+    constexpr double dot(const vec3d &v) const { return x * v.x + y * v.y + z * v.z; }
     constexpr double &operator[](const size_t i)
     {
         switch (i)
@@ -187,9 +155,7 @@ struct vec3d
 struct matrix3d
 {
 public:
-    constexpr matrix3d(const vec3d &x, const vec3d &y, const vec3d &z) : x(x), y(y), z(z)
-    {
-    }
+    constexpr matrix3d(const vec3d &x, const vec3d &y, const vec3d &z) : x(x), y(y), z(z) {}
     explicit constexpr matrix3d(const geometry_msgs::Quaternion &Q)
     {
         matrix3d &rot = *this;
@@ -219,7 +185,6 @@ public:
     }
     constexpr vec3d &operator[](const size_t i)
     {
-        assert(i >= 0 && i < 3);
         switch (i)
         {
         case 0:
@@ -230,6 +195,8 @@ public:
             return z;
 
         default:
+            std::cerr << "Index out of bounds" << std::endl;
+            std::exit(EXIT_FAILURE);
             return x; // just to satisfy the compiler
         }
     }
