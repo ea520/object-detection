@@ -60,14 +60,6 @@ namespace util
             cv::cvtColor(output, output, cv::COLOR_RGB2BGR);
         return output;
     }
-
-    bool Rate::wait()
-    {
-        using namespace std::chrono;
-        auto wait_time = t0 + us - high_resolution_clock::now();
-        std::this_thread::sleep_for(wait_time);
-        return wait_time > 0ns;
-    }
     cpu_timer_t::cpu_timer_t()
     {
         FILE *file;

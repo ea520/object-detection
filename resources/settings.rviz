@@ -4,13 +4,10 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Global Options1
-        - /Status1
-        - /Axes1
-        - /Image1
-        - /Image2
+        - /Odometry1/Shape1
+        - /Odometry1/Covariance1
       Splitter Ratio: 0.5
-    Tree Height: 418
+    Tree Height: 419
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -26,7 +23,6 @@ Panels:
     Name: Views
     Splitter Ratio: 0.5
   - Class: rviz/Time
-    Experimental: false
     Name: Time
     SyncMode: 0
     SyncSource: Image
@@ -55,31 +51,14 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /visualization_marker
-      Name: Marker
-      Namespaces:
-        corrosive: true
-        dangerous: true
-        explosive: true
-        fire extinguisher: true
-        flammable: true
-        flammable-solid: true
-        infectious-substance: true
-        inhalation-hazard: true
-        non-flammable-gas: true
-        organic-peroxide: true
-        oxygen: true
-        spontaneously-combustible: true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Axes
+    - Alpha: 1
+      Class: rviz/Axes
       Enabled: true
       Length: 1
       Name: Axes
       Radius: 0.009999999776482582
       Reference Frame: <Fixed Frame>
+      Show Trail: false
       Value: true
     - Class: rviz/Image
       Enabled: true
@@ -105,12 +84,58 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /visualization_marker
+      Name: MarkerArray
+      Namespaces:
+        QR: true
+        QR-text: true
+        covariances: true
+        objects: true
+      Queue Size: 100
+      Value: true
+    - Angle Tolerance: 0.10000000149011612
+      Class: rviz/Odometry
+      Covariance:
+        Orientation:
+          Alpha: 0.5
+          Color: 255; 255; 127
+          Color Style: Unique
+          Frame: Local
+          Offset: 1
+          Scale: 10
+          Value: false
+        Position:
+          Alpha: 0.30000001192092896
+          Color: 204; 51; 204
+          Scale: 1
+          Value: true
+        Value: true
+      Enabled: true
+      Keep: 1
+      Name: Odometry
+      Position Tolerance: 0.10000000149011612
+      Queue Size: 10
+      Shape:
+        Alpha: 1
+        Axes Length: 1
+        Axes Radius: 0.10000000149011612
+        Color: 255; 25; 0
+        Head Length: 0.10000000149011612
+        Head Radius: 0.10000000149011612
+        Shaft Length: 0.20000000298023224
+        Shaft Radius: 0.05000000074505806
+        Value: Arrow
+      Topic: /t265/odom/sample
+      Unreliable: false
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Default Light: true
-    Fixed Frame: my_frame
-    Frame Rate: 20
+    Fixed Frame: odom
+    Frame Rate: 10
   Name: root
   Tools:
     - Class: rviz/Interact
@@ -132,26 +157,26 @@ Visualization Manager:
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
-      Distance: 7.570730209350586
+      Class: rtabmap_ros/OrbitOriented
+      Distance: 10.586700439453125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
+      Field of View: 0.7853981852531433
       Focal Point:
-        X: 0
-        Y: 0
-        Z: 0
+        X: -1.735992431640625
+        Y: -0.1786373108625412
+        Z: 1.3857117891311646
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.18479830026626587
+      Pitch: 0.6552619934082031
       Target Frame: <Fixed Frame>
-      Value: Orbit (rviz)
-      Yaw: 4.515068054199219
+      Yaw: 2.797752857208252
     Saved:
       - Angle: 0
         Class: rviz/TopDownOrtho
@@ -165,7 +190,6 @@ Visualization Manager:
         Near Clip Distance: 0.009999999776482582
         Scale: 281.2167663574219
         Target Frame: <Fixed Frame>
-        Value: TopDownOrtho (rviz)
         X: 0
         Y: 0
       - Class: rviz/Orbit
@@ -175,6 +199,7 @@ Visualization Manager:
           Stereo Focal Distance: 1
           Swap Stereo Eyes: false
           Value: false
+        Field of View: 0.7853981852531433
         Focal Point:
           X: 0
           Y: 0
@@ -186,17 +211,16 @@ Visualization Manager:
         Near Clip Distance: 0.009999999776482582
         Pitch: 0.6397972106933594
         Target Frame: <Fixed Frame>
-        Value: Orbit (rviz)
         Yaw: 6.058180332183838
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 1056
+  Height: 1043
   Hide Left Dock: false
   Hide Right Dock: false
   Image:
     collapsed: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000019800000380fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000a0049006d006100670065010000003e000001c60000001600fffffffc0000020a000001b4000000e80100001dfa000000000100000002fb0000000a0049006d0061006700650100000000ffffffff0000005c00fffffffb000000100044006900730070006c0061007900730100000000000002210000015600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f00000380fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003e00000380000000a600fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b20000000000000000000000020000078000000149fc0100000003fb0000000a0049006d0061006700650100000000000004140000000000000000fb0000000a0049006d006100670065010000041a000003660000000000000000fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d00650100000000000007800000027e00fffffffb0000000800540069006d00650100000000000004500000000000000000000004cd0000038000000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  QMainWindow State: 000000ff00000000fd0000000400000000000001d800000375fc0200000009fb0000001200530065006c0065006300740069006f006e00000001e10000009b0000005c00fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb0000000a0049006d006100670065010000003d000001c00000001600fffffffc00000203000001af000000e60100001cfa000000000100000002fb0000000a0049006d0061006700650100000000ffffffff0000005e00fffffffb000000100044006900730070006c0061007900730100000000000002210000015600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000010f00000375fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073010000003d00000375000000a400fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b20000000000000000000000020000078000000149fc0100000003fb0000000a0049006d0061006700650100000000000004140000000000000000fb0000000a0049006d006100670065010000041a000003660000000000000000fb0000000a00560069006500770073030000004e00000080000002e10000019700000003000007800000003efc0100000002fb0000000800540069006d0065010000000000000780000003bc00fffffffb0000000800540069006d006501000000000000045000000000000000000000048d0000037500000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:

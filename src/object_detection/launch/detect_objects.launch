@@ -21,7 +21,7 @@ _________________________
 <launch>
 	<arg name="rosbag_path" default=""/>
 	<arg name="rviz" default="True"/>
-	<arg name="gpu" default="False"/>
+	<arg name="gpu" default="True"/>
 
 
 	<arg name="device_type_camera1"				default="t265"/>
@@ -79,15 +79,12 @@ _________________________
 	</group>
 	
 	<group unless="$(eval rosbag_path == '')">
-		<node name="player" pkg="rosbag" type="play" output="log" args="--clock -r 1 $(arg rosbag_path)"/>
+		<node name="player" pkg="rosbag" type="play" output="log" args="-r 1 $(arg rosbag_path)"/>
 	</group>
 
-
-	<node name="print_csv" pkg="object_detection" type=".print_csv" cwd="node"/>
 	<node name="detect" pkg="object_detection" type="detect3d" cwd="node" args="_gpu:=$(arg gpu)"/>
-	<node name="cluster" pkg="object_detection" type=".cluster" cwd="node" args="_rviz:=$(arg rviz)"/>
 	<group if="$(arg rviz)">
-		<env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
+		<!-- <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/> -->
 		<node name="visualiser" pkg="rviz" type="rviz" args="-d $(find object_detection)/../../resources/settings.rviz" required="true"/>
 	</group>
 
