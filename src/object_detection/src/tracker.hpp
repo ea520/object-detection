@@ -15,6 +15,7 @@ struct state_3d
     visualization_msgs::Marker get_object_marker() const;
     visualization_msgs::Marker get_covariance_marker() const;
     visualization_msgs::Marker get_QR_text_marker() const;
+    // Distance metric for 2 noisy measurements
     inline float distance(const observation_3d &new_obs) const
     {
         // Objects of different types can't be matched

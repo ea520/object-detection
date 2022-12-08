@@ -4,6 +4,7 @@
 constexpr float SCORE_THRESHOLD = 0.2;
 constexpr float NMS_THRESHOLD = 0.4;
 
+// Convert the image into a 640*512 image with a grey top/bottom or left/right border depending on the input aspect ratio
 cv::Mat yolo_net::format_yolov5(const cv::Mat &source, int &xoffset, int &yoffset, float &scale_factor)
 {
     int col = source.cols;
@@ -26,6 +27,8 @@ cv::Mat yolo_net::format_yolov5(const cv::Mat &source, int &xoffset, int &yoffse
     cv::copyMakeBorder(resized, result, top, bottom, left, right, cv::BORDER_CONSTANT, cv::Scalar(114, 114, 114));
     return result;
 }
+
+// Get the class names from the file
 std::vector<std::string> load_names(const std::string &path)
 {
     std::ifstream ifs(path);
@@ -36,7 +39,7 @@ std::vector<std::string> load_names(const std::string &path)
     }
     return ret;
 }
-std::string output_name;
+
 yolo_net::yolo_net(const std::string &bin_path, const std::string &xml_path, const std::string &class_list_path, int target, float conf_thresh)
     : conf_thresh(conf_thresh)
 {
@@ -92,17 +95,16 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
 /*
  - resize the input image and add borders so it's the right input shape
  - run the YOLO inference on that image
- - the output format is an array of {x,y,w,h,conf,score1,...,score16}
+ - the output format is an array of {x,y,w,h,conf,score1,...,scoreN} where N is the number of of classes
  - where x,y are the coordinates of the top left of the bounding box
- - these coordinates are normalised to [0,1]
- - w,h are the width and height of the bounding box. Also normalised.
+ - these coordinates may or may not be normalised to [0,1]
+ - w,h are the width and height of the bounding box. Also normalised possibly.
  - conf is the confidence in the prediction [0,1]
  - the detected class is the one with the highest score
- - The variable `rows` is the number of such arrays there are.
- - Perhaps the yolo output format is best shown by looking at the variable `data`
  -
 */
 {
+    // Do the inference
     cv::Mat blob;
     int xoffset, yoffset;
     float scale_factor;
@@ -111,13 +113,12 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
     net.setInput(blob);
 
     cv::Mat outputs;
-    // net.forward(outputs, "output"); // perform inference, get the data
     net.forward(outputs, output_name); // perform inference, get the data
 
     const float *start = reinterpret_cast<const float *>(outputs.data);
     const float *end = start + detection_count * floats_per_detection;
-    const static int nclasses = floats_per_detection - 5;
-    std::vector<int> class_ids; // class_ids[0] would be the class id corresponding to the networks 1st confident output
+    const static int nclasses = floats_per_detection - 5; // {x,y,w,h,conf} corresponds to 5
+    std::vector<int> class_ids;                           // class_ids[0] would be the class id corresponding to the networks 1st confident output
     std::vector<float> confidences;
     std::vector<cv::Rect> boxes;
     for (const float *ptr = start; ptr < end; ptr += floats_per_detection)
@@ -127,16 +128,23 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
               w = ptr[2],
               h = ptr[3],
               conf = ptr[4];
+        // scores is an array that starts 5 floats from the start
         const float *scores = ptr + 5;
+        // sanity check
         assert(0. <= conf && conf <= 1.);
         if (conf < conf_thresh) // threshold the confidence
             continue;
 
+        // find the max score
         const float *max_score_ptr = std::max_element(scores, scores + nclasses);
+        // find the corresponding index in the scores array
         int class_id = max_score_ptr - scores;
+
+        // sanity check
         assert(class_id >= 0 && class_id <= nclasses);
 
-        if (*max_score_ptr > SCORE_THRESHOLD) // threshold the max score
+        // threshold the max score
+        if (*max_score_ptr > SCORE_THRESHOLD)
         {
             confidences.push_back(conf);
             class_ids.push_back(class_id);
@@ -157,12 +165,14 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
         }
     }
 
+    // Some objects will be double counted. If there are bounding boxes that intersect a lot, choose the ones with the higher confidence score
     std::vector<int> nms_result;
     cv::dnn::NMSBoxes(boxes, confidences, SCORE_THRESHOLD, NMS_THRESHOLD, nms_result);
 
     std::vector<object2d> output;
     output.reserve(nms_result.size());
 
+    // Record the remaining bounding boxes
     for (int idx : nms_result)
     {
         object2d result;

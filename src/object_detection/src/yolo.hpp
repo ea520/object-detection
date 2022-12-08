@@ -18,4 +18,5 @@ private:
     float conf_thresh;
     int detection_count, floats_per_detection, INPUT_HEIGHT, INPUT_WIDTH;
     std::vector<std::string> class_list;
+    std::string output_name;
 };

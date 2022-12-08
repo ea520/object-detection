@@ -30,7 +30,8 @@ rm ./install_dependencies.sh # you can now remove the file if the install was su
 source setupvars.bash 
 catkin_make -DCMAKE_BUILD_TYPE=RELEASE 
 ```-->
-
+## TODO:
+UPDATE installation commands
 ## Run the code
 
 ### If you have a couple Gb storage:

@@ -1,5 +1,8 @@
 #include "tracker.hpp"
 #include <ros/package.h>
+#include <Eigen/Eigenvalues>
+
+// WILL CAUSE ERRORS IF AND WHEN THE OBJECT LABELS CHANGE
 static int get_id(const std::string &txt)
 {
     if (txt == "IH")
@@ -28,8 +31,10 @@ static int get_id(const std::string &txt)
         return 11;
     else if (txt == "PO")
         return 12;
+    throw std::runtime_error("The names of the hazmat signs have probably been changed");
     return -1;
 }
+// Perform a kalman filter update step
 void state_3d::update(const observation_3d &new_obs)
 {
     assert(new_obs.type == type);
@@ -53,7 +58,8 @@ void state_3d::update(const observation_3d &new_obs)
         ps(class_idx) = new_obs.confidence;
         probs = probs * old_weight + ps * (1.f - old_weight);
     }
-    // take the average of all the normals
+
+    // take the average of all the normals (THIS WON'T BE NORMALIZED)
     normal = normal * old_weight + new_obs.normal * (1.f - old_weight);
     hit_count++;
     miss_count = 0;
@@ -71,6 +77,7 @@ Eigen::Quaternionf normal_to_quaternion(Eigen::Vector3f n)
     return q;
 }
 
+// Very verbose  but it just produces the messages for rviz to render the objects
 visualization_msgs::Marker state_3d::get_object_marker() const
 {
     visualization_msgs::Marker marker;
@@ -108,7 +115,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.id = id;
         marker.type = visualization_msgs::Marker::MESH_RESOURCE;
         marker.action = visualization_msgs::Marker::ADD;
-        std::string path = ros::package::getPath("object_detection") + "/../../resources/";
+        std::string path = ros::package::getPath("object_detection") + "/../../resources/meshes/";
         marker.mesh_resource = "file://" + path + filenames[index];
         marker.mesh_use_embedded_materials = true;
         marker.scale.x = marker.scale.y = marker.scale.z = .5;
@@ -147,7 +154,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.id = id;
         marker.type = visualization_msgs::Marker::MESH_RESOURCE;
         marker.action = visualization_msgs::Marker::ADD;
-        std::string path = ros::package::getPath("object_detection") + "/../../resources/";
+        std::string path = ros::package::getPath("object_detection") + "/../../resources/meshes/";
         marker.mesh_resource = "file://" + path + "fire-extinguisher.dae";
         marker.mesh_use_embedded_materials = true;
         marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
@@ -170,7 +177,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.pose.orientation.z = q.z();
         marker.pose.orientation.w = q.w();
 
-        marker.scale.x = 0.1;
+        marker.scale.x = 0.04;
         marker.scale.y = 0.8;
         marker.scale.z = 2.0;
         marker.color.a = 1.;
@@ -186,6 +193,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
     return marker;
 }
 
+// Draw elipses for the covariance matrix
 visualization_msgs::Marker state_3d::get_covariance_marker() const
 {
     visualization_msgs::Marker marker;
@@ -220,6 +228,7 @@ visualization_msgs::Marker state_3d::get_covariance_marker() const
     return marker;
 }
 
+// Marker for the QR code text
 visualization_msgs::Marker state_3d::get_QR_text_marker() const
 {
     assert(type == object_type::QR);
@@ -241,46 +250,56 @@ visualization_msgs::Marker state_3d::get_QR_text_marker() const
     return marker;
 }
 
+// Match oobjects and update them
 void tracker_t::update(const std::vector<observation_3d> &_new_obs)
 {
     std::vector<object_type> available_objects = {object_type::HAZMAT, object_type::FIRE_EXTINGUISHER, object_type::QR, object_type::DOOR};
+
     // Separate the objects by type
     std::unordered_map<object_type, std::vector<observation_3d>> new_objects;
     for (const auto &obj : _new_obs)
     {
-            new_objects[obj.type].push_back(obj);
+        new_objects[obj.type].push_back(obj);
     }
-
-    // Matrixes of distances from known objects to new objects
-    // One matrix per object type
 
     for (auto t : available_objects)
     {
+
         Eigen::MatrixXf distances = Eigen::MatrixXf::Zero(objects[t].size(), new_objects[t].size());
 
         for (int i = 0; i < (int)objects[t].size(); i++)
             for (int j = 0; j < (int)new_objects[t].size(); j++)
                 distances(i, j) = objects[t][i].distance(new_objects[t][j]);
 
+        // There is a very low probability of a false negative at this threshold (assuming noise model is correct)
         constexpr float threshold = 21.0f;
+
+        // Keep track of which previously known objects have been paired
         std::vector<bool> knowns_paired = std::vector<bool>(objects[t].size(), false);
+
+        // Keep track of which new observations have been paried
         std::vector<bool> new_paired = std::vector<bool>(new_objects[t].size(), false);
-        if (distances.rows() && distances.cols())
+        // Make sure the array isn't empty (i.e. at the start)
+        if (distances.size())
             while (true)
             {
+                // Find the closest objects and match them if they're within a threshold
                 Eigen::Index known, _new;
                 distances.minCoeff(&known, &_new);
 
                 if (distances(known, _new) > threshold)
                     break;
 
+                // Mark them as paired and tick them off
                 knowns_paired[known] = true;
                 new_paired[_new] = true;
                 objects[t][known].update(new_objects[t][_new]);
 
+                // Make sure neither of these can be matched again
                 distances.row(known).array() = INFINITY;
                 distances.col(_new).array() = INFINITY;
             }
+        // Go through the known objects which weren't in frame. Delete them if there's insufficient evidence that the objects actually exists
         for (int i = knowns_paired.size() - 1; i > -1; i--)
         {
             if (!knowns_paired[i])
@@ -292,6 +311,8 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                     objects[t].erase(objects[t].begin() + i);
             }
         }
+
+        // Go through the new observations that hadn't been seen before. Add them to the list of known objects.
         for (int i = 0; i < (int)new_paired.size(); i++)
         {
             if (!new_paired[i])

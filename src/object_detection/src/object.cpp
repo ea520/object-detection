@@ -66,6 +66,7 @@ Eigen::Vector3f get_normal(std::vector<Eigen::Vector3f> points, float *mse)
     return n.normalized();
 }
 
+// Draw the bounding boxes to the image
 void draw_boxes(const std::vector<object2d> &detections, cv::Mat &frame)
 {
     for (size_t i = 0; i < detections.size(); ++i)
@@ -76,32 +77,30 @@ void draw_boxes(const std::vector<object2d> &detections, cv::Mat &frame)
         const cv::Point2i bottom_right{detection.u + detection.w / 2, detection.v + detection.w / 2};
         const cv::Rect box{top_left, bottom_right};
         auto classId = (std::hash<std::string>{}(detection.text) + (size_t)detection.type) % colors.size();
+        if (detection.text == "")
+            classId = rand();
         const auto &color = colors[classId];
-        char buff[6];
-        snprintf(buff, sizeof(buff), " %.2f", detection.confidence);
+        // Get a string for the confidence
+        char buff[6] = "\0";
+        if (detection.type != object_type::QR)
+            snprintf(buff, sizeof(buff), " %.2f", detection.confidence);
 
+        // draw the bounding box
         cv::rectangle(frame, box, color, 3);
+
+        // Draw a filled box where the text will go
         cv::rectangle(frame, cv::Point(box.x, box.y - 10), cv::Point(box.x + box.width, box.y), color, cv::FILLED);
+        // Make the text collor dissimilar to the background colour
         cv::Scalar textcolor;
         textcolor[0] = color[0] < 128 ? 255 : 0;
         textcolor[1] = color[1] < 128 ? 255 : 0;
         textcolor[2] = color[2] < 128 ? 255 : 0;
+        // Write the text
         cv::putText(frame, detection.text + buff, cv::Point(box.x, box.y), cv::FONT_HERSHEY_PLAIN, 1.0, textcolor);
     }
 }
-// TODO: Change this
-static constexpr rs2_intrinsics intrinsics{
-    640,
-    480,
-    322.505524f,
-    249.334457f,
-    616.423279f,
-    616.756714f,
-    RS2_DISTORTION_INVERSE_BROWN_CONRADY,
-    {0.f, 0.f, 0.f, 0.f, 0.f}
 
-};
-
+// For planar objects, how big can the average square error be for it to be considered a plane?
 float mse_tol(object_type type)
 {
     switch (type)
@@ -115,6 +114,8 @@ float mse_tol(object_type type)
         return INFINITY;
     }
 }
+
+// For horizontal objects, what angle to the horizontal is tolerable
 float angle_tol(object_type type)
 {
     switch (type)
@@ -126,14 +127,16 @@ float angle_tol(object_type type)
     }
 }
 
-inline Eigen::Vector3f deproject(std::array<float, 2> uv, float depth)
+// Find the coordinates of pixel (u,v) at depth d relative to the camera
+inline Eigen::Vector3f deproject(std::array<float, 2> uv, float depth, const rs2_intrinsics &intrinsics)
 {
     Eigen::Vector3f ret;
     rs2_deproject_pixel_to_point((float *)&ret, &intrinsics, uv.data(), depth);
     return ret;
 }
 
-std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> &detections, cv::Mat &depth)
+// Find the normals relative to the camera and depths for the objects
+std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> &detections, cv::Mat &depth, const rs2_intrinsics &intrinsics)
 {
     std::vector<object2d_with_depth> ret;
     for (const auto &detection : detections)
@@ -179,38 +182,41 @@ std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> 
     return ret;
 }
 
-inline constexpr float get_object_variance(object_type type)
+// X is parallel to the surface normal
+// Z is approximately vertical if the normal is horizontal
+// Y is perpendicular to X and Z
+inline Eigen::DiagonalMatrix<float, 3> get_object_covariance(object_type type)
 {
+    float sx, sy, sz;
     switch (type)
     {
     case object_type::QR:
-        return .01 * .01; // Can locate the centre of the QR code to within 1cm
+        sx = sy = sz = .01; // Can locate the centre of the QR code to within 1cm
+        break;
     case object_type::HAZMAT:
-        return .01 * .01; //
+        sx = sy = sz = .01; //
+        break;
     case object_type::DOOR:
-        return .4 * .4; //
+        sx = 0.1;
+        sy = 0.2;
+        sz = 1.;
+
+        break;
     case object_type::PERSON:
-        return .4 * .4; //
+        sx = sy = sz = .4; //
+        break;
     case object_type::FIRE_EXTINGUISHER:
-        return .4 * .4; //
+        sx = sy = sz = .4; //
+        break;
     default:
-        return NAN;
+        sx = sy = sz = NAN; //
+        break;
     }
+    return Eigen::DiagonalMatrix<float, 3>(sx * sx, sy * sy, sz * sz);
 }
 
-inline Eigen::Matrix3f get_jacobian(std::array<float, 2> uv, float depth)
-{
-    Eigen::Vector3f ddu = deproject({uv[0] + 0.5f, uv[1]}, depth) - deproject({uv[0] - 0.5f, uv[1]}, depth);
-    Eigen::Vector3f ddv = deproject({uv[0], uv[1] + 0.5f}, depth) - deproject({uv[0], uv[1] - 0.5f}, depth);
-    const float epsilon = 0.05f * depth; // use 1 cm for the derivative
-    Eigen::Vector3f ddd = (deproject({uv[0], uv[1]}, depth + epsilon / 2) - deproject({uv[0], uv[1]}, depth - epsilon / 2)) / epsilon;
-    Eigen::Matrix3f ret;
-    ret.col(0) << ddu;
-    ret.col(1) << ddv;
-    ret.col(2) << ddd;
-    return ret;
-}
-Eigen::Matrix3f get_rotation()
+// The rotation of the camera relative to the world coordinates
+Eigen::Matrix3f get_extrinsic_rotation()
 {
     Eigen::Matrix3f P = Eigen::Matrix3f::Zero();
     P.row(0) << 0.0162226, 0.0753285, 0.997027;
@@ -219,29 +225,50 @@ Eigen::Matrix3f get_rotation()
     return P;
 }
 
-std::vector<observation_3d> get_3d(const std::vector<object2d_with_depth> &detections, const camera_pose_t &camera_pose)
+// Get the points in 3D space relative to a stationary reference frame
+std::vector<observation_3d> get_3d(const std::vector<object2d_with_depth> &detections, const camera_pose_t &camera_pose, const rs2_intrinsics &intrinsics)
 {
+    // The return value
     std::vector<observation_3d> ret;
-    static const Eigen::Matrix3f Q0 = get_rotation();
+
+    // The coodinate transform from the depth camera to the tracking camera
+    static const Eigen::Matrix3f Q0 = get_extrinsic_rotation();
     static const Eigen::Vector3f t0 = Eigen::Vector3f{0.02104983, 0.05304557, 0.05261957};
+
+    // The camera rotation as a rotation matrix
     const Eigen::Matrix3f Q{camera_pose.rotation};
 
     for (const auto &det : detections)
     {
         observation_3d obj;
-        Eigen::Vector3f pos_wrt_camera = deproject({(float)det.u, (float)det.v}, det.depth + 0.1); // Add 10 cm to get a point somewhere inside the fire extinguisher rather than the surface
+
+        // Get the position of the objects relative to the depth camera
+        Eigen::Vector3f pos_wrt_camera = deproject({(float)det.u, (float)det.v}, det.depth, intrinsics);
+
+        // Find the corresponding point relative to a stationary reference frame
         obj.position = Q * (Q0 * pos_wrt_camera + t0) + camera_pose.translation;
-        obj.covariance = Eigen::Matrix3f::Identity() * get_object_variance(det.type) + camera_pose.covariance; // Just the position covariance, not the angle
+
+        // Rotate the normal with the new reference frame
+        obj.normal = Q * Q0 * det.normal;
+
+        // Find a rotation matrix that takes (1,0,0) to this normal
+        auto n = obj.normal.normalized();
+        auto axis = Eigen::Vector3f::UnitX().cross(n);
+        axis.normalize();
+        float theta = acosf(Eigen::Vector3f::UnitX().dot(n));
+        Eigen::Matrix3f normal_rotation(Eigen::AngleAxisf(theta, axis));
+        Eigen::DiagonalMatrix<float, 3> Lambda = get_object_covariance(det.type);
+
+        // The covariance matrix is roated accordngly
+        auto object_covariance = normal_rotation * Lambda * normal_rotation.transpose();
+
+        // The total noise is the camera's translation error plus the fact that the pixel you chose won't be exaclty at the object's centre
+        obj.covariance = object_covariance + camera_pose.covariance;
         obj.type = det.type;
         obj.text = det.text;
         obj.confidence = det.confidence;
-        obj.normal = Q * Q0 * det.normal;
-        auto normal = obj.normal;
-        auto normal_horizontal = normal;
-        normal_horizontal.z() = 0;
-        normal_horizontal.normalize();
-        float angle = acosf(normal_horizontal.dot(normal));
-        if (angle < angle_tol(det.type))
+        // Small angle approximation
+        if (fabs(obj.normal.z()) < angle_tol(det.type))
             ret.push_back(obj);
     }
     return ret;

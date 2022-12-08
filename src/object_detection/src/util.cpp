@@ -6,6 +6,7 @@
 #include "sys/vtimes.h"
 namespace util
 {
+    // Convert an opencv image to a ros immage message
     sensor_msgs::Image toImageMsg(const cv::Mat &image)
     {
         sensor_msgs::Image ros_image;
@@ -52,6 +53,7 @@ namespace util
         return 0; // just incase the compiler complains
     }
 
+    // Convert a ros image to an opencv one.
     cv::Mat toCVMat(const sensor_msgs::ImageConstPtr &img)
     {
 
@@ -60,19 +62,35 @@ namespace util
             cv::cvtColor(output, output, cv::COLOR_RGB2BGR);
         return output;
     }
-    cpu_timer_t::cpu_timer_t()
+}
+
+// https://stackoverflow.com/a/64166
+namespace cpu_monitor
+{
+    static clock_t lastCPU, lastSysCPU, lastUserCPU;
+    static int numProcessors;
+
+    void init()
     {
         FILE *file;
         struct tms timeSample;
+        char line[128];
 
         lastCPU = times(&timeSample);
         lastSysCPU = timeSample.tms_stime;
         lastUserCPU = timeSample.tms_utime;
 
         file = fopen("/proc/cpuinfo", "r");
+        numProcessors = 0;
+        while (fgets(line, 128, file) != NULL)
+        {
+            if (strncmp(line, "processor", 9) == 0)
+                numProcessors++;
+        }
         fclose(file);
     }
-    int cpu_timer_t::getCPUPercentage()
+
+    double getCurrentValue()
     {
         struct tms timeSample;
         clock_t now;
@@ -90,12 +108,13 @@ namespace util
             percent = (timeSample.tms_stime - lastSysCPU) +
                       (timeSample.tms_utime - lastUserCPU);
             percent /= (now - lastCPU);
+            percent /= numProcessors;
             percent *= 100;
         }
         lastCPU = now;
         lastSysCPU = timeSample.tms_stime;
         lastUserCPU = timeSample.tms_utime;
 
-        return (int)percent;
+        return percent;
     }
 }
