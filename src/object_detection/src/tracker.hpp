@@ -41,7 +41,8 @@ struct tracker_t
         {
             for (const auto &obj : objs)
             {
-                ret.push_back(obj);
+                if (obj.hit_count >= 10)
+                    ret.push_back(obj);
             }
         }
         return ret;

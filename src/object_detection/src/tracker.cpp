@@ -82,6 +82,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
 {
     visualization_msgs::Marker marker;
     marker.header.frame_id = "odom";
+    marker.id = id;
     marker.header.stamp = ros::Time();
     marker.pose.position.x = position.x();
     marker.pose.position.y = position.y();
@@ -112,7 +113,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         probs.maxCoeff(&index);
 
         marker.ns = "objects";
-        marker.id = id;
+
         marker.type = visualization_msgs::Marker::MESH_RESOURCE;
         marker.action = visualization_msgs::Marker::ADD;
         std::string path = ros::package::getPath("object_detection") + "/../../resources/meshes/";
@@ -129,7 +130,6 @@ visualization_msgs::Marker state_3d::get_object_marker() const
     case object_type::QR:
     {
         marker.ns = "QR";
-        marker.id = id;
         marker.type = visualization_msgs::Marker::CUBE;
         marker.action = visualization_msgs::Marker::ADD;
 
@@ -151,7 +151,6 @@ visualization_msgs::Marker state_3d::get_object_marker() const
     case object_type::FIRE_EXTINGUISHER:
     {
         marker.ns = "fire-extinguishers";
-        marker.id = id;
         marker.type = visualization_msgs::Marker::MESH_RESOURCE;
         marker.action = visualization_msgs::Marker::ADD;
         std::string path = ros::package::getPath("object_detection") + "/../../resources/meshes/";
@@ -167,23 +166,18 @@ visualization_msgs::Marker state_3d::get_object_marker() const
     case object_type::DOOR:
     {
         marker.ns = "door";
-        marker.id = id;
-        marker.type = visualization_msgs::Marker::CUBE;
+        marker.type = visualization_msgs::Marker::MESH_RESOURCE;
         marker.action = visualization_msgs::Marker::ADD;
+        std::string path = ros::package::getPath("object_detection") + "/../../resources/meshes/";
+        marker.mesh_resource = "file://" + path + "DoorCOLLADA.dae";
+        marker.mesh_use_embedded_materials = true;
 
         Eigen::Quaternionf q = normal_to_quaternion(normal);
         marker.pose.orientation.x = q.x();
         marker.pose.orientation.y = q.y();
         marker.pose.orientation.z = q.z();
         marker.pose.orientation.w = q.w();
-
-        marker.scale.x = 0.04;
-        marker.scale.y = 0.8;
-        marker.scale.z = 2.0;
-        marker.color.a = 1.;
-        marker.color.r = .8;
-        marker.color.g = .8;
-        marker.color.b = .8;
+        marker.scale.x = marker.scale.y = marker.scale.z = 1.;
     }
     break;
 
@@ -200,7 +194,6 @@ visualization_msgs::Marker state_3d::get_covariance_marker() const
     marker.header.frame_id = "odom";
     marker.header.stamp = ros::Time();
     marker.ns = "covariances";
-    marker.id = id;
     marker.type = visualization_msgs::Marker::SPHERE;
     marker.action = visualization_msgs::Marker::ADD;
     marker.pose.position.x = position.x();
@@ -236,7 +229,6 @@ visualization_msgs::Marker state_3d::get_QR_text_marker() const
     marker.header.frame_id = "odom";
     marker.header.stamp = ros::Time();
     marker.ns = "QR-text";
-    marker.id = id;
     marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
     marker.action = visualization_msgs::Marker::ADD;
     marker.pose.position.x = position.x();

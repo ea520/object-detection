@@ -1,15 +1,10 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-catkin_add_env_hooks("setupvars" SHELLS bash DIRECTORY "${CMAKE_SOURCE_DIR}/../")
-
 project(object_detection)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS_RELEASE "-march=native -Wall")
-set(OpenCV_DIR /opt/intel/openvino_2022/opencv/cmake)
-
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -26,22 +21,23 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(catkin REQUIRED)
 find_package(realsense2 CONFIG REQUIRED)
-find_package(OpenCV 4.6.0 EXACT REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Boost COMPONENTS timer REQUIRED)
 
 
+
+
+include(GetOpenCV.txt)
 catkin_package(
-    CATKIN_DEPENDS message_runtime
 )
 
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
 file(GLOB SRC_FILES "src/*.cpp")
 
 add_executable(detect3d  ${SRC_FILES})
+add_dependencies(detect3d opencv46)
+target_include_directories(detect3d PRIVATE ${OPENCV_DIR}/include/ ${catkin_INCLUDE_DIRS})
+target_link_directories(detect3d PRIVATE ${OPENCV_DIR}/lib/)
 
 target_link_libraries(detect3d
     ${catkin_LIBRARIES} 
@@ -50,4 +46,5 @@ target_link_libraries(detect3d
     Threads::Threads 
     zbar
     realsense2::realsense2 
+    ${OpenCV_LIB_COMPONENTS}
 )

@@ -1,37 +1,9 @@
 # Object detection
-<!-- ## Install dependencies
-### Install ROS (if you haven't already)
-
-```bash
-sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
-sudo apt-get install curl
-curl -s https://raw.githubusercontent.com/ros/rosdistro/master/ros.asc | sudo apt-key add -
-sudo apt update
-# ROS_DISTRO=melodic # ubuntu18
-ROS_DISTRO=noetic # ubuntu20
-sudo apt-get install ros-$ROS_DISTRO-desktop
-echo "source /opt/ros/$ROS_DISTRO/setup.bash" >> ~/.bashrc
-source /opt/ros/$ROS_DISTRO/setup.bash
-# sudo apt-get install catkin python-rosdep python-rosinstall python-rosinstall-generator python-wstool build-essential # ubuntu18
-sudo apt install python3-rosdep python3-rosinstall python3-rosinstall-generator python3-wstool build-essential python3-catkin # ubuntu20
-sudo rosdep init
-rosdep update
-```
-
-### Install dependencies and compile
-```
-git clone https://github.com/ea520/object-detection && cd object-detection
-```
-```bash
-./install_dependencies.sh
-rm ./install_dependencies.sh # you can now remove the file if the install was successful
-```
-```bash
-source setupvars.bash 
-catkin_make -DCMAKE_BUILD_TYPE=RELEASE 
-```-->
-## TODO:
-UPDATE installation commands
+- Install [ros](http://wiki.ros.org/noetic/Installation/Ubuntu) and [openvino](https://docs.openvino.ai/latest/openvino_docs_install_guides_installing_openvino_from_archive_linux.html#doxid-openvino-docs-install-guides-installing-openvino-from-archive-linux)
+- Source /opt/intel/openvino_2022/setupvars.sh 
+- Run catkin_make
+- Wait about an hour for the first compile (it needs to download and compile opencv first time). Subsequent compiles should only take a few seconds.
+- If you make changes to the code and get an error like this: `error while loading shared libraries: libopencv_imgcodecs.so.406: cannot open shared object file: No such file or directory`, a temporary fix would be to add build/install/lib to LD_LIBRARY_PATH.
 ## Run the code
 
 ### If you have a couple Gb storage:
