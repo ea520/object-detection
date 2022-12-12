@@ -1,6 +1,7 @@
 # Object detection
 - Install [ros](http://wiki.ros.org/noetic/Installation/Ubuntu) and [openvino](https://docs.openvino.ai/latest/openvino_docs_install_guides_installing_openvino_from_archive_linux.html#doxid-openvino-docs-install-guides-installing-openvino-from-archive-linux)
 - Source /opt/intel/openvino_2022/setupvars.sh 
+- `rosdep install --from-paths .`
 - Run catkin_make
 - Wait about an hour for the first compile (it needs to download and compile opencv first time). Subsequent compiles should only take a few seconds.
 - If you make changes to the code and get an error like this: `error while loading shared libraries: libopencv_imgcodecs.so.406: cannot open shared object file: No such file or directory`, a temporary fix would be to add build/install/lib to LD_LIBRARY_PATH.
