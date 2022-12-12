@@ -8,9 +8,6 @@
 
   <license>MIT</license>
 
-
-
-    <build_depend>message_generation</build_depend>
     <depend>roslib</depend>
     <depend>std_msgs</depend>
     <depend>message_filters</depend>
@@ -20,13 +17,9 @@
     <depend>roslaunch</depend>
     <depend>roscpp</depend>
     <depend>realsense2_camera</depend>
-    <depend>libmlpack-dev</depend>
     <depend>zbar</depend>
     <depend>libusb-1.0-dev</depend>
     <depend>libdbus-dev</depend>
-    <depend>python3-numpy</depend>
-
-    <exec_depend>message_runtime</exec_depend>
     <buildtool_depend>catkin</buildtool_depend>
   <export>
   </export>
