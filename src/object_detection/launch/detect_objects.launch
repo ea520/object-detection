@@ -44,6 +44,7 @@ _________________________
 	<arg name="calib_odom_file"					default=""/>
 
 	<group if="$(eval rosbag_path == '')">
+		<param name="/use_sim_time" value="false" />
 		<group ns="$(arg camera1)">
 			<include file="$(find realsense2_camera)/launch/includes/nodelet.launch.xml">
 			<arg name="device_type"				value="$(arg device_type_camera1)"/>
@@ -76,10 +77,11 @@ _________________________
 			</include>
 		</group>
 		<node pkg="tf" type="static_transform_publisher" name="t265_to_d400" args="0 0 0 0 0 0 /t265_link /d400_link 100"/>
+        <node pkg="tf2_ros" type="static_transform_publisher" name="transform" args="0 0 0 0 0 0 /base_link /t265_odom_frame"/>
+		<node name="odometry_tf" pkg="object_detection" type="odometry_tf"/>
 	</group>
 
 	<group unless="$(eval rosbag_path == '')">
-		<node name="odometry_tf" pkg="object_detection" type="odometry_tf"/>
 		<node name="player" pkg="rosbag" type="play" output="log" args="-r 1 --clock $(arg rosbag_path)"/>
 		<param name="/use_sim_time" value="true" />
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st1" args="0 0 0 0 0 0 /d400_link /d400_depth_frame"/>
@@ -88,13 +90,15 @@ _________________________
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st4" args="0 0 0 -0.5 0.5 -0.5 0.5 /d400_aligned_depth_to_color_frame /d400_color_optical_frame"/>
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st5" args="-9.369389590574428e-05 0.014774083159863949 7.438292959704995e-05 -0.010236486792564392 0.0028636795468628407 0.0024234976153820753 0.9999405741691589 /d400_link /d400_aligned_depth_to_color_frame"/>
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st6" args="0 0 0 0 0 0 /t265_pose_frame /t265_link"/>
-        <node pkg="tf2_ros" type="static_transform_publisher" name="st7" args="0 0 0 0 0 0 base_link t265_pose_frame"/>
+        <node pkg="tf2_ros" type="static_transform_publisher" name="st7" args="0 0 0 0 0 0 /base_link /t265_odom_frame"/>
+        <node pkg="tf2_ros" type="static_transform_publisher" name="st8" args="0 0 0 0 0 0 /base_link /t265_pose_frame"/>
         <node pkg="tf2_ros" type="static_transform_publisher" name="t265_to_d400" args="0 0 0 0 0 0  /t265_link /d400_link"/>
+		<node name="odometry_tf" pkg="object_detection" type="odometry_tf"/>
 	</group>
 
 	<node name="detect" pkg="object_detection" type="detect3d" cwd="node" args="_gpu:=$(arg gpu)"/>
 	<group if="$(arg rviz)">
-		<!-- <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/> -->
+		<env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
 		<node name="visualiser" pkg="rviz" type="rviz" args="-d $(find object_detection)/../../resources/settings.rviz" required="true"/>
 	</group>
 

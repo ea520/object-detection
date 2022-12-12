@@ -15,6 +15,7 @@
 #include <boost/timer/timer.hpp>
 #include <std_msgs/String.h>
 #include <numeric>
+#include <fstream>
 // To store camera properies e.g. focal length
 rs2_intrinsics intrinsics;
 
@@ -88,7 +89,7 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
 
     // Get all of the objects that the tracker is aware of. Some may not be in the camera frame.
     auto tracked_objs = tracker.get_objects();
-
+    std::sort(tracked_objs.begin(), tracked_objs.end());
     // Send a message for rviz to render the objects
     visualization_msgs::MarkerArray markerarr;
     for (const auto &obj : tracked_objs)
@@ -116,6 +117,7 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
              average_cpu_percentage, 1000.f * average_inference_time, 1. / rate.expectedCycleTime().toSec());
     std_msgs::String text_msg;
     text_msg.data = buff;
+    std::cout << buff << std::endl;
 
     // Draw the bounding boxes onto the image
     draw_boxes(output_2d, frame);
@@ -139,7 +141,7 @@ int main(int argc, char **argv)
     cpu_monitor::init();
 
     // Get the camera parameters
-    auto camera_info_msg = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("/d400/aligned_depth_to_color/camera_info", nh, ros::Duration(10));
+    auto camera_info_msg = ros::topic::waitForMessage<sensor_msgs::CameraInfo>("/d400/aligned_depth_to_color/camera_info", nh, ros::Duration(30));
     intrinsics.width = camera_info_msg->width;
     intrinsics.height = camera_info_msg->height;
     intrinsics.ppx = camera_info_msg->K[2];
@@ -160,10 +162,26 @@ int main(int argc, char **argv)
     message_filters::Subscriber<sensor_msgs::Image> colour_sub(nh, "/d400/color/image_raw", 1);
     message_filters::Subscriber<sensor_msgs::Image> depth_sub(nh, "/d400/aligned_depth_to_color/image_raw", 1);
     message_filters::Subscriber<nav_msgs::Odometry> gyro_sub(nh, "/t265/odom/sample", 10);
-
+    {
+        auto path = ros::package::getPath("object_detection") + "/detections.csv";
+        std::ofstream output_file(path);
+        using sysclock_t = std::chrono::system_clock;
+        std::time_t now = sysclock_t::to_time_t(sysclock_t::now());
+        char buf[16] = {0};
+        std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
+        auto time = std::string(buf);
+        std::strftime(buf, sizeof(buf), "%Y-%m-%d", std::localtime(&now));
+        auto date = std::string(buf);
+        output_file << "pois" << std::endl;
+        output_file << "1.2" << std::endl;
+        output_file << date << std::endl;
+        output_file << time << std::endl;
+        output_file << "<MISSION>" << std::endl;
+        output_file << "id,time,text,x,y,z,robot,mode,type" << std::endl;
+    }
     // Setup the subscriber to sync the tracking and depth camera messages
     using sync_type = message_filters::sync_policies::ApproximateTime<sensor_msgs::Image, sensor_msgs::Image, nav_msgs::Odometry>;
-    message_filters::Synchronizer<sync_type> sync(sync_type(10), colour_sub, depth_sub, gyro_sub);
+    message_filters::Synchronizer<sync_type> sync(sync_type(50), colour_sub, depth_sub, gyro_sub);
     sync.registerCallback(boost::bind(&camera_callback, _1, _2, _3));
 
     // Find the path to the YOLO model and make the net

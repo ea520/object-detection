@@ -21,6 +21,8 @@ std::vector<object2d> QR_scanner::detect(const cv::Mat &image)
             y1 = std::min(y1, y_val);
             y2 = std::max(y2, y_val);
         }
+        if (x1 == x2 || y1 == y2)
+            continue;
         object2d obj;
         obj.u = (x1 + x2) / 2;
         obj.v = (y1 + y2) / 2;

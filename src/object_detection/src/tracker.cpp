@@ -1,6 +1,7 @@
 #include "tracker.hpp"
 #include <ros/package.h>
 #include <Eigen/Eigenvalues>
+#include <fstream>
 
 // WILL CAUSE ERRORS IF AND WHEN THE OBJECT LABELS CHANGE
 static int get_id(const std::string &txt)
@@ -61,6 +62,12 @@ void state_3d::update(const observation_3d &new_obs)
 
     // take the average of all the normals (THIS WON'T BE NORMALIZED)
     normal = normal * old_weight + new_obs.normal * (1.f - old_weight);
+    auto path = ros::package::getPath("object_detection") + "/detections.csv";
+    std::ofstream output_file(path, std::ios_base::app);
+    if (hit_count == min_detection_count())
+    {
+        output_file << *this << std::endl;
+    }
     hit_count++;
     miss_count = 0;
 }
@@ -299,7 +306,7 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                 // object wasn't found in the most recent frame
                 // increment the miss count
                 objects[t][i].miss_count++;
-                if (objects[t][i].miss_count > 100 && objects[t][i].hit_count < 10 && t != object_type::QR)
+                if (objects[t][i].miss_count > 100 && objects[t][i].hit_count < objects[t][i].min_detection_count())
                     objects[t].erase(objects[t].begin() + i);
             }
         }
@@ -338,4 +345,64 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
             }
         }
     }
+}
+
+std::string current_time()
+{
+    using sysclock_t = std::chrono::system_clock;
+    std::time_t now = sysclock_t::to_time_t(sysclock_t::now());
+
+    char buf[16] = {0};
+    std::strftime(buf, sizeof(buf), "%H:%M:%S", std::localtime(&now));
+
+    return std::string(buf);
+}
+
+std::ostream &operator<<(std::ostream &os, const state_3d &self)
+{
+    static const std::array<std::string, 13> names = {
+
+        "inhalation-hazard",
+        "infectious-substance",
+        "explosive",
+        "non-flammable-gas",
+        "organic-peroxide",
+        "flammable",
+        "radioactive",
+        "spontaneously-combustible",
+        "oxygen",
+        "dangerous",
+        "flammable-solid",
+        "corrosive",
+        "poison",
+
+    };
+    std::unordered_map<object_type, std::string> type_to_str{
+        {object_type::HAZMAT, "hazmat"},
+        {object_type::QR, "qr code"},
+        {object_type::DOOR, "door"},
+        {object_type::FIRE_EXTINGUISHER, "fire extinguisher"},
+        {object_type::PERSON, "person"},
+    };
+    std::string text = self.QR_txt;
+    if (self.type == object_type::HAZMAT)
+    {
+        Eigen::Index id;
+        self.probs.maxCoeff(&id);
+        text = names[id];
+    }
+    auto prev = os.precision(2);
+    {
+        os << self.id << ',';
+        os << current_time() << ',';
+        os << text << ',';
+        os << self.position.x() << ',';
+        os << self.position.y() << ',';
+        os << self.position.z() << ',';
+        os << "Arbie" << ',';
+        os << "T" << ',';
+        os << type_to_str[self.type];
+    }
+    os.precision(prev);
+    return os;
 }

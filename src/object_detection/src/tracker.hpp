@@ -15,6 +15,7 @@ struct state_3d
     visualization_msgs::Marker get_object_marker() const;
     visualization_msgs::Marker get_covariance_marker() const;
     visualization_msgs::Marker get_QR_text_marker() const;
+    friend std::ostream &operator<<(std::ostream &os, const state_3d &self);
     // Distance metric for 2 noisy measurements
     inline float distance(const observation_3d &new_obs) const
     {
@@ -30,6 +31,20 @@ struct state_3d
         Eigen::Matrix3f S = covariance + new_obs.covariance;
         return e.dot(S.inverse() * e);
     }
+    inline int min_detection_count() const
+    {
+        switch (type)
+        {
+        case object_type::QR:
+            return 0;
+        default:
+            return 10;
+        }
+    }
+    inline bool operator<(const state_3d &other)
+    {
+        return id < other.id;
+    }
 };
 struct tracker_t
 {
@@ -41,7 +56,7 @@ struct tracker_t
         {
             for (const auto &obj : objs)
             {
-                if (obj.hit_count >= 10)
+                if (obj.hit_count >= obj.min_detection_count())
                     ret.push_back(obj);
             }
         }
