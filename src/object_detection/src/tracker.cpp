@@ -48,16 +48,7 @@ void state_3d::update(const observation_3d &new_obs)
     // For hazmats, update the probability distribution
     if (type == object_type::HAZMAT)
     {
-        Eigen::Matrix<float, 13, 1> ps = Eigen::Matrix<float, 13, 1>::Zero();
-        ps.array() = (1 - new_obs.confidence) / 12;
-        int class_idx = get_id(new_obs.text);
-        if (class_idx < 0)
-        {
-            std::cerr << "ID ERROR";
-            return;
-        }
-        ps(class_idx) = new_obs.confidence;
-        probs = probs * old_weight + ps * (1.f - old_weight);
+        distribution = distribution * old_weight + new_obs.distribution * (1.f - old_weight);
     }
 
     // take the average of all the normals (THIS WON'T BE NORMALIZED)
@@ -117,7 +108,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
 
         };
         Eigen::Index index;
-        probs.maxCoeff(&index);
+        distribution.maxCoeff(&index);
 
         marker.ns = "objects";
 
@@ -164,10 +155,15 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.mesh_resource = "file://" + path + "fire-extinguisher.dae";
         marker.mesh_use_embedded_materials = true;
         marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
-        marker.pose.orientation.x = 0;
-        marker.pose.orientation.y = 0;
-        marker.pose.orientation.z = 0;
-        marker.pose.orientation.w = 1;
+        Eigen::Quaternionf q = normal_to_quaternion(normal);
+        marker.pose.orientation.x = q.x();
+        marker.pose.orientation.y = q.y();
+        marker.pose.orientation.z = q.z();
+        marker.pose.orientation.w = q.w();
+        // marker.pose.orientation.x = 0;
+        // marker.pose.orientation.y = 0;
+        // marker.pose.orientation.z = 0;
+        // marker.pose.orientation.w = 1;
     }
     break;
     case object_type::DOOR:
@@ -200,6 +196,7 @@ visualization_msgs::Marker state_3d::get_covariance_marker() const
     visualization_msgs::Marker marker;
     marker.header.frame_id = "odom";
     marker.header.stamp = ros::Time();
+    marker.id = id;
     marker.ns = "covariances";
     marker.type = visualization_msgs::Marker::SPHERE;
     marker.action = visualization_msgs::Marker::ADD;
@@ -235,6 +232,7 @@ visualization_msgs::Marker state_3d::get_QR_text_marker() const
     visualization_msgs::Marker marker;
     marker.header.frame_id = "odom";
     marker.header.stamp = ros::Time();
+    marker.id = id;
     marker.ns = "QR-text";
     marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
     marker.action = visualization_msgs::Marker::ADD;
@@ -326,15 +324,7 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                 new_state.type = observation.type;
                 if (observation.type == object_type::HAZMAT)
                 {
-                    Eigen::Matrix<float, 13, 1> probs = Eigen::Array<float, 13, 1>((1. - observation.confidence) / 12);
-                    int class_idx = get_id(observation.text);
-                    if (class_idx < 0)
-                    {
-                        std::cout << "ID ERROR";
-                        continue;
-                    }
-                    probs(class_idx) = observation.confidence;
-                    new_state.probs = probs;
+                    new_state.distribution = observation.distribution;
                 }
                 else if (observation.type == object_type::QR)
                 {
@@ -388,7 +378,7 @@ std::ostream &operator<<(std::ostream &os, const state_3d &self)
     if (self.type == object_type::HAZMAT)
     {
         Eigen::Index id;
-        self.probs.maxCoeff(&id);
+        self.distribution.maxCoeff(&id);
         text = names[id];
     }
     auto prev = os.precision(2);

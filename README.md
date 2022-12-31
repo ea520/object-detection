@@ -3,6 +3,32 @@
 - Source /opt/intel/openvino_2022/setupvars.sh 
 - `git clone https://github.com/ea520/object-detection.git && cd object-detection`
 - `rosdep install --from-paths .`
+- ```
+	sudo apt-get install \
+	build-essential \
+	cmake \
+	ninja-build \
+	libgtk-3-dev \
+	libpng-dev \
+	libjpeg-dev \
+	libwebp-dev \
+	libtiff5-dev \
+	libopenexr-dev \
+	libopenblas-dev \
+	libx11-dev \
+	libavutil-dev \
+	libavcodec-dev \
+	libavformat-dev \
+	libswscale-dev \
+	libavresample-dev \
+	libtbb2 \
+	libssl-dev \
+	libva-dev \
+	libmfx-dev \
+	libgstreamer1.0-dev \
+	libgstreamer-plugins-base1.0-dev \
+	nasm
+```
 - `catkin_make`
 - Wait about an hour for the first compile (it needs to download and compile opencv first time). Subsequent compiles should only take a few seconds.
 - If you make changes to the code and get an error like this: `error while loading shared libraries: libopencv_imgcodecs.so.406: cannot open shared object file: No such file or directory`, a temporary fix would be to add build/install/lib to LD_LIBRARY_PATH.
@@ -27,4 +53,6 @@ roslaunch object_detection detect_objects.launch  gpu:=True #rviz:=False
 
 With any luck, you'll see the following screen:
 
-![Object detection visualization](resources/rviz-output.png)
+Here's a [video](https://www.youtube.com/watch?v=nOl2P3Si6bg) of it working on a pre-recorded rosbag file. 
+
+A summary of the method used is in [this](method.pdf) file

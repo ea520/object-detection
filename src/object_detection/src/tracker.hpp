@@ -5,8 +5,8 @@ struct state_3d
     object_type type;
     Eigen::Vector3f position;
     Eigen::Matrix3f covariance;
-    Eigen::Matrix<float, 13, 1> probs; // redundant for everything but hazmats
-    Eigen::Vector3f normal;            // redundant for non-planar objects
+    Eigen::Matrix<float, 13, 1> distribution; // redundant for everything but hazmats
+    Eigen::Vector3f normal;                   // redundant for non-planar objects
     int miss_count = 0;
     int hit_count = 0;
     int id;             // unique ID for other objects

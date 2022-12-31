@@ -18,7 +18,6 @@
     <depend>roslaunch</depend>
     <depend>roscpp</depend>
     <depend>realsense2_camera</depend>
-    <depend>zbar</depend>
     <depend>libusb-1.0-dev</depend>
     <depend>libdbus-dev</depend>
     <buildtool_depend>catkin</buildtool_depend>

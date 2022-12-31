@@ -82,8 +82,8 @@ _________________________
 	</group>
 
 	<group unless="$(eval rosbag_path == '')">
-		<node name="player" pkg="rosbag" type="play" output="log" args="-r 1 --clock $(arg rosbag_path)"/>
 		<param name="/use_sim_time" value="true" />
+		<node name="player" pkg="rosbag" type="play" output="log" args="-r 1 --clock $(arg rosbag_path)"/>
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st1" args="0 0 0 0 0 0 /d400_link /d400_depth_frame"/>
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st2" args="0 0 0 -0.5 0.5 -0.5 0.5 /d400_depth_frame /d400_depth_optical_frame"/>
 		<node pkg="tf2_ros" type="static_transform_publisher" name="st3" args="-9.369389590574428e-05 0.014774083159863949 7.438292959704995e-05 -0.010236486792564392 0.0028636795468628407 0.0024234976153820753 0.9999405741691589 /d400_link /d400_color_frame"/>
@@ -98,7 +98,7 @@ _________________________
 
 	<node name="detect" pkg="object_detection" type="detect3d" cwd="node" args="_gpu:=$(arg gpu)"/>
 	<group if="$(arg rviz)">
-		<env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
+		<!-- <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/> -->
 		<node name="visualiser" pkg="rviz" type="rviz" args="-d $(find object_detection)/../../resources/settings.rviz" required="true"/>
 	</group>
 

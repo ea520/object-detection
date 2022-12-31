@@ -46,23 +46,23 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
 
     // Find all the objects, their positions and sizes
     std::vector<object2d> yolo_output, QR_output;
-    auto detect_yolo = [&]()
+    auto detect_yolo = [&yolo_output, &frame]()
     {
         yolo_output = net.detect(frame);
     };
-    auto detect_qr = [&]()
+    auto detect_qr = [&QR_output, &frame]()
     {
         QR_output = scanner.detect(frame);
     };
     {
         // Do the detection of objects and QRs on 2 separate threads
-        boost::timer::cpu_timer tmr;
+        auto t0 = std::chrono::high_resolution_clock::now();
         std::thread t1(detect_qr);
         std::thread t2(detect_yolo);
         t1.join();
         t2.join();
-        tmr.stop();
-        inference_times.push_back(tmr.elapsed().wall * 1e-9f); // nanoseconds to seconds
+        std::chrono::duration<float> dt = std::chrono::high_resolution_clock::now() - t0;
+        inference_times.push_back(dt.count());
     }
     // Combine QRs and objects into one array
     auto output_2d = yolo_output;
@@ -117,7 +117,6 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
              average_cpu_percentage, 1000.f * average_inference_time, 1. / rate.expectedCycleTime().toSec());
     std_msgs::String text_msg;
     text_msg.data = buff;
-    std::cout << buff << std::endl;
 
     // Draw the bounding boxes onto the image
     draw_boxes(output_2d, frame);
@@ -189,7 +188,7 @@ int main(int argc, char **argv)
     std::string bin_path{path + "best.bin"}, xml_path{path + "best.xml"};
     std::string txt_path = path + "classes.txt";
     int target = GPU ? cv::dnn::DNN_TARGET_OPENCL_FP16 : cv::dnn::DNN_TARGET_CPU;
-    net = yolo_net(bin_path, xml_path, txt_path, target, 0.8);
+    net = yolo_net(bin_path, xml_path, txt_path, target);
 
     // Publisher to show the objects in rviz
     vis_pub = nh.advertise<visualization_msgs::MarkerArray>("visualization_marker", 0);

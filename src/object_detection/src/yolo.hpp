@@ -5,7 +5,7 @@
 
 struct yolo_net
 {
-    yolo_net(const std::string &bin_path, const std::string &xml_path, const std::string &class_list_path, int target, float conf_thresh = 0.8);
+    yolo_net(const std::string &bin_path, const std::string &xml_path, const std::string &class_list_path, int target, float conf_thresh = 0.7);
     yolo_net(){};
     std::vector<object2d> detect(const cv::Mat &image);
     void set_conf_thresh(float thresh) { conf_thresh = thresh; }

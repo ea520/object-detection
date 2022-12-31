@@ -26,7 +26,7 @@ static const std::array<cv::Scalar, 22> colors = {
     cv::Scalar(255, 255, 255),
     cv::Scalar(0, 0, 0)};
 
-Eigen::Vector3f get_normal(std::vector<Eigen::Vector3f> points, float *mse)
+Eigen::Vector3f get_normal(std::vector<Eigen::Vector3f> points, float *mse = nullptr)
 {
     // It is assumed the depth is on the z axis
     // This then does least squares on the z error
@@ -61,9 +61,30 @@ Eigen::Vector3f get_normal(std::vector<Eigen::Vector3f> points, float *mse)
     n(2) = -1.; // Normal points somewhat towards the camera
     n.head<2>() = A.ldlt().solve(b);
     auto errors = mat * n;
-    // std::cout << errors * 100.f << std::endl;
-    *mse = errors.dot(errors) / errors.rows();
+    if (mse)
+        *mse = errors.dot(errors) / errors.rows();
     return n.normalized();
+}
+
+Eigen::Vector3f get_axis(std::vector<Eigen::Vector3f> points)
+{
+    // Least squares fit for (nx,ny,nz) * (ax,-1,az) = 0 aka (nx,nz) * (ax,az) = ny
+    if (points.size() < 10)
+        throw std::runtime_error("Not enough points to calculate plane (need at least 10)");
+    typedef Eigen::Matrix<float, Eigen::Dynamic, 3, Eigen::RowMajor> Mat3x;
+    Mat3x mat = Eigen::Map<Mat3x>(&points[0][0], points.size(), 3);
+    Eigen::Matrix2f A;
+    A(0, 0) = mat.col(0).dot(mat.col(0));
+    A(1, 0) = A(0, 1) = mat.col(0).dot(mat.col(2));
+    A(1, 1) = mat.col(1).dot(mat.col(2));
+    Eigen::Vector2f b{
+        mat.col(0).dot(mat.col(1)),
+        mat.col(2).dot(mat.col(1)),
+    };
+    Eigen::Vector3f axis;
+    axis(1) = -1.; // Normal points somewhat towards the camera
+    axis.head<2>() = A.ldlt().solve(b);
+    return axis.normalized();
 }
 
 // Draw the bounding boxes to the image
@@ -135,6 +156,25 @@ inline Eigen::Vector3f deproject(std::array<float, 2> uv, float depth, const rs2
     return ret;
 }
 
+std::vector<Eigen::Vector3f> sample_depth_map(cv::Mat &depth, int u, int v, int w, int h, size_t N, const rs2_intrinsics &intrinsics)
+{
+    std::vector<Eigen::Vector3f> points;
+    size_t iterations = 0;
+    while (points.size() < N && iterations++ < 2 * N)
+    {
+        int x = u + rand() % w;
+        int y = v + rand() % h;
+        float dist = depth.at<uint16_t>(y, x) / 1000.;
+        if (dist < 0.1f)
+            continue;
+        float positionsf[3];
+        float coords[] = {(float)x, (float)y};
+        rs2_deproject_pixel_to_point(positionsf, &intrinsics, coords, dist);
+        points.emplace_back(positionsf[0], positionsf[1], positionsf[2]);
+    }
+    return points;
+}
+
 // Find the normals relative to the camera and depths for the objects
 std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> &detections, cv::Mat &depth, const rs2_intrinsics &intrinsics)
 {
@@ -150,33 +190,54 @@ std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> 
         det.confidence = detection.confidence;
         det.text = detection.text;
         det.type = detection.type;
-        std::vector<Eigen::Vector3f> points;
-        static constexpr size_t N = 64 * 64;
-        // smaller bounding box;
-        int width = 0.8 * detection.w;
-        int height = 0.8 * detection.h;
-        int u = det.u - width / 2;  // left
-        int v = det.v - height / 2; // top
-        size_t iterations = 0;
-        // Find N points. Give up is the map is full of holes
-        while (points.size() < N && iterations++ < 2 * N)
+        det.distribution = detection.distribution;
+        if (det.type == object_type::DOOR || det.type == object_type::HAZMAT || det.type == object_type::QR)
         {
-            int x = u + rand() % width;
-            int y = v + rand() % height;
-            float dist = depth.at<uint16_t>(y, x) / 1000.;
-            if (dist < 0.1f)
-                continue;
-            float positionsf[3];
-            float coords[] = {(float)x, (float)y};
-            rs2_deproject_pixel_to_point(positionsf, &intrinsics, coords, dist);
-            points.emplace_back(positionsf[0], positionsf[1], positionsf[2]);
+            static constexpr size_t N = 64 * 64;
+            // smaller bounding box;
+            int width = 0.8 * detection.w;
+            int height = 0.8 * detection.h;
+            int u = det.u - width / 2;  // left
+            int v = det.v - height / 2; // top
+            size_t iterations = 0;
+            std::vector<Eigen::Vector3f> points = sample_depth_map(depth, u, v, width, height, N, intrinsics);
+            if (points.size() == N)
+            {
+                float mse;
+                det.normal = get_normal(points, &mse);
+                if (mse < mse_tol(det.type))
+                    ret.push_back(det);
+            }
         }
-        if (points.size() == N)
+        else if (det.type == object_type::FIRE_EXTINGUISHER)
         {
-            float mse;
-            det.normal = get_normal(points, &mse);
-            if (mse < mse_tol(det.type))
-                ret.push_back(det);
+            // smaller bounding box;
+            int width = 0.2 * detection.w;
+            int height = 0.2 * detection.h;
+            int u0 = det.u - width / 2;  // left
+            int v0 = det.v - height / 2; // top
+            int w = width / 4;
+            int h = height / 4;
+            static constexpr size_t N = 16 * 16;
+            std::vector<Eigen::Vector3f> normals;
+            for (int i = 0; i < 4; i++)
+                for (int j = 0; j < 4; j++)
+                {
+                    int u = u0 + i * w;
+                    int v = v0 + j * h;
+                    std::vector<Eigen::Vector3f> points = sample_depth_map(depth, u, v, w, h, N, intrinsics);
+                    if (points.size() == N)
+                    {
+                        normals.push_back(get_normal(points));
+                    }
+                }
+            if (normals.size() > 10)
+            {
+                det.normal = get_axis(normals);
+            }
+            else
+                det.normal *= NAN;
+            ret.push_back(det);
         }
     }
     return ret;
@@ -250,7 +311,6 @@ std::vector<observation_3d> get_3d(const std::vector<object2d_with_depth> &detec
 
         // Rotate the normal with the new reference frame
         obj.normal = Q * Q0 * det.normal;
-
         // Find a rotation matrix that takes (1,0,0) to this normal
         auto n = obj.normal.normalized();
         auto axis = Eigen::Vector3f::UnitX().cross(n);
@@ -267,7 +327,8 @@ std::vector<observation_3d> get_3d(const std::vector<object2d_with_depth> &detec
         obj.type = det.type;
         obj.text = det.text;
         obj.confidence = det.confidence;
-        // Small angle approximation
+        obj.distribution = det.distribution;
+
         if (fabs(obj.normal.z()) < angle_tol(det.type))
             ret.push_back(obj);
     }

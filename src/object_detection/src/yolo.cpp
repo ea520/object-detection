@@ -1,7 +1,8 @@
 #include "yolo.hpp"
 #include <fstream>
 #include <thread>
-constexpr float SCORE_THRESHOLD = 0.2;
+#include <Eigen/Dense>
+constexpr float SCORE_THRESHOLD = 0.7;
 constexpr float NMS_THRESHOLD = 0.4;
 
 // Convert the image into a 640*512 image with a grey top/bottom or left/right border depending on the input aspect ratio
@@ -43,8 +44,10 @@ std::vector<std::string> load_names(const std::string &path)
 yolo_net::yolo_net(const std::string &bin_path, const std::string &xml_path, const std::string &class_list_path, int target, float conf_thresh)
     : conf_thresh(conf_thresh)
 {
+
     std::ifstream bin{bin_path}, xml{xml_path};
-    assert(bin.is_open() && xml.is_open());
+    if (!bin.is_open() || !xml.is_open())
+        throw std::runtime_error("Could not open the YOLO model");
     bin.close();
     xml.close();
     net = cv::dnn::readNetFromModelOptimizer(xml_path, bin_path);
@@ -68,7 +71,7 @@ yolo_net::yolo_net(const std::string &bin_path, const std::string &xml_path, con
     }
     else
     {
-        std::cout << "model output layer is ambiguuous. Could be:";
+        std::cout << "model output layer is ambiguous. Could be:";
         for (auto &name : names)
             printf("%s ", name.c_str());
         std::cout << std::endl;
@@ -90,6 +93,11 @@ yolo_net::yolo_net(const std::string &bin_path, const std::string &xml_path, con
         std::cerr << "Warning: class list is too big. Probably using the wrong class list." << std::endl;
     }
 }
+
+bool is_person(int idx) { return idx == 0; }
+bool is_fire_extinguisher(int idx) { return idx == 1; }
+bool is_door(int idx) { return idx == 2; }
+bool is_hazmat(int idx) { return idx >= 3 && idx < 16; }
 
 std::vector<object2d> yolo_net::detect(const cv::Mat &image)
 /*
@@ -120,6 +128,7 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
     const static int nclasses = floats_per_detection - 5; // {x,y,w,h,conf} corresponds to 5
     std::vector<int> class_ids;                           // class_ids[0] would be the class id corresponding to the networks 1st confident output
     std::vector<float> confidences;
+    std::vector<Eigen::VectorXf> distributions;
     std::vector<cv::Rect> boxes;
     for (const float *ptr = start; ptr < end; ptr += floats_per_detection)
     {
@@ -137,6 +146,7 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
 
         // find the max score
         const float *max_score_ptr = std::max_element(scores, scores + nclasses);
+        Eigen::Map<const Eigen::VectorXf> cond_probs(scores, nclasses);
         // find the corresponding index in the scores array
         int class_id = max_score_ptr - scores;
 
@@ -146,7 +156,6 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
         // threshold the max score
         if (*max_score_ptr > SCORE_THRESHOLD)
         {
-            confidences.push_back(conf);
             class_ids.push_back(class_id);
             if (x < 1. && y < 1. && w < 1. && h < 1.)
             {
@@ -162,6 +171,22 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
             cv::Size2i box_size((int)(w * scale_factor), (int)(h * scale_factor));
 
             boxes.emplace_back(top_left, box_size); // add the corresponding box to the list
+
+            // Distribution over all classes (it was calculated with 16bit floats so won't add to 1)
+            Eigen::VectorXf distribution = cond_probs.array() / cond_probs.sum();
+            // Distribution over the hazmats (sum is less than 1)
+            distribution = distribution.tail(nclasses - 3);
+
+            if (is_hazmat(class_id))
+            {
+                conf *= distribution.sum(); // The probability there is an object and it is a hazmat
+            }
+            else
+            {
+                conf *= *max_score_ptr;
+            }
+            distributions.push_back(distribution);
+            confidences.push_back(conf);
         }
     }
 
@@ -182,14 +207,17 @@ std::vector<object2d> yolo_net::detect(const cv::Mat &image)
         result.h = boxes[idx].height;
         result.u = boxes[idx].x + result.w / 2;
         result.v = boxes[idx].y + result.h / 2;
-        if (class_ids[idx] == 0)
+        if (is_person(class_ids[idx]))
             result.type = object_type::PERSON;
-        else if (class_ids[idx] == 1)
+        else if (is_fire_extinguisher(class_ids[idx]))
             result.type = object_type::FIRE_EXTINGUISHER;
-        else if (class_ids[idx] == 2)
+        else if (is_door(class_ids[idx]))
             result.type = object_type::DOOR;
-        else if (class_ids[idx] > 2 && class_ids[idx] < 16)
+        else if (is_hazmat(class_ids[idx]))
+        {
             result.type = object_type::HAZMAT;
+            result.distribution = distributions[idx];
+        }
         else
         {
             std::stringstream ss;
