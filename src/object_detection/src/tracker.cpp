@@ -40,6 +40,7 @@ void state_3d::update(const observation_3d &new_obs)
 {
     assert(new_obs.type == type);
     // Kalman filter for stationary object
+    covariance += Eigen::Matrix3f::Identity() * (type == object_type::PERSON ? (0.3 * 0.3) : 0);
     Eigen::Matrix3f gain = covariance * (covariance + new_obs.covariance).inverse();
     position += gain * (new_obs.position - position);
     covariance -= gain * covariance;
@@ -156,14 +157,14 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.mesh_use_embedded_materials = true;
         marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
         Eigen::Quaternionf q = normal_to_quaternion(normal);
-        marker.pose.orientation.x = q.x();
-        marker.pose.orientation.y = q.y();
-        marker.pose.orientation.z = q.z();
-        marker.pose.orientation.w = q.w();
-        // marker.pose.orientation.x = 0;
-        // marker.pose.orientation.y = 0;
-        // marker.pose.orientation.z = 0;
-        // marker.pose.orientation.w = 1;
+        // marker.pose.orientation.x = q.x();
+        // marker.pose.orientation.y = q.y();
+        // marker.pose.orientation.z = q.z();
+        // marker.pose.orientation.w = q.w();
+        marker.pose.orientation.x = 0;
+        marker.pose.orientation.y = 0;
+        marker.pose.orientation.z = 0;
+        marker.pose.orientation.w = 1;
     }
     break;
     case object_type::DOOR:
@@ -181,6 +182,20 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.pose.orientation.z = q.z();
         marker.pose.orientation.w = q.w();
         marker.scale.x = marker.scale.y = marker.scale.z = 1.;
+    }
+    break;
+    case object_type::PERSON:
+    {
+        marker.ns = "Person";
+        marker.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.pose.position.x = position.x();
+        marker.pose.position.y = position.y();
+        marker.pose.position.z = position.z();
+        marker.text = "Person: #" + std::to_string(id);
+        marker.scale.z = 0.02;
+        marker.color.r = marker.color.a = 1;
+        marker.lifetime = ros::Duration(0.5);
     }
     break;
 
@@ -250,7 +265,7 @@ visualization_msgs::Marker state_3d::get_QR_text_marker() const
 // Match oobjects and update them
 void tracker_t::update(const std::vector<observation_3d> &_new_obs)
 {
-    std::vector<object_type> available_objects = {object_type::HAZMAT, object_type::FIRE_EXTINGUISHER, object_type::QR, object_type::DOOR};
+    std::vector<object_type> available_objects = {object_type::HAZMAT, object_type::FIRE_EXTINGUISHER, object_type::QR, object_type::DOOR, object_type::PERSON};
 
     // Separate the objects by type
     std::unordered_map<object_type, std::vector<observation_3d>> new_objects;
@@ -304,7 +319,9 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                 // object wasn't found in the most recent frame
                 // increment the miss count
                 objects[t][i].miss_count++;
-                if (objects[t][i].miss_count > 100 && objects[t][i].hit_count < objects[t][i].min_detection_count())
+                if (objects[t][i].type == object_type::PERSON && objects[t][i].miss_count > 100)
+                    objects[t].erase(objects[t].begin() + i);
+                else if (objects[t][i].miss_count > 100 && objects[t][i].hit_count < objects[t][i].min_detection_count())
                     objects[t].erase(objects[t].begin() + i);
             }
         }

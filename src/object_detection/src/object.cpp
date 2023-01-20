@@ -239,6 +239,11 @@ std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> 
                 det.normal *= NAN;
             ret.push_back(det);
         }
+        else if (det.type == object_type::PERSON)
+        {
+            det.normal = Eigen::Vector3f::UnitZ();
+            ret.push_back(det);
+        }
     }
     return ret;
 }
