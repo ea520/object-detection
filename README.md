@@ -1,5 +1,5 @@
 # Object detection
-- Install [ros](http://wiki.ros.org/noetic/Installation/Ubuntu) and [openvino](https://docs.openvino.ai/latest/openvino_docs_install_guides_installing_openvino_from_archive_linux.html#doxid-openvino-docs-install-guides-installing-openvino-from-archive-linux)
+- Install [ros](http://wiki.ros.org/noetic/Installation/Ubuntu) and [openvino](https://docs.openvino.ai/latest/openvino_docs_install_guides_installing_openvino_from_archive_linux.html#doxid-openvino-docs-install-guides-installing-openvino-from-archive-linux). Remember to do [this](https://docs.openvino.ai/latest/openvino_docs_install_guides_configurations_for_intel_gpu.html#gpu-guide) as well
 - Source /opt/intel/openvino_2022/setupvars.sh 
 - `git clone https://github.com/ea520/object-detection.git && cd object-detection`
 - `rosdep install --from-paths .`
@@ -36,7 +36,7 @@
 
 ### If you have a few Gb storage:
 Download [this rosbag file](https://drive.google.com/drive/u/1/folders/1Y2u8pNS8XX3paCsEkHHC_YGhx59B44ql) and save it.
-This is a 1-minute recording of the sensor streams
+This is a 1-minute recording of the sensor data
 
 ```bash
 rosbag decompress recording.bag

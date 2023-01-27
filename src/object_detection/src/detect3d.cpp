@@ -20,7 +20,7 @@
 rs2_intrinsics intrinsics;
 
 // process at most 10 images per sec
-static constexpr double target_rate = 10.;
+static constexpr double target_rate = 8.;
 
 // for detecting non-QR objects
 yolo_net net;

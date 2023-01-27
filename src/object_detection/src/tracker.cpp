@@ -52,7 +52,7 @@ void state_3d::update(const observation_3d &new_obs)
         distribution = distribution * old_weight + new_obs.distribution * (1.f - old_weight);
     }
     if (!new_obs.orientation_matrix.hasNaN())
-        orientation_covar += new_obs.orientation_matrix;
+        orientation_matrix += new_obs.orientation_matrix;
 
     auto path = ros::package::getPath("object_detection") + "/detections.csv";
     std::ofstream output_file(path, std::ios_base::app);
@@ -89,7 +89,7 @@ visualization_msgs::Marker state_3d::get_object_marker(const Eigen::Quaternionf 
     marker.lifetime = ros::Duration(0.5);
 
     Eigen::Vector3f camera_direction = camera_orientation * Eigen::Vector3f::UnitX();
-    auto normal = covar_to_orientation(orientation_covar);
+    auto normal = covar_to_orientation(orientation_matrix);
     if (camera_direction.dot(normal) > 0)
         normal *= -1;
     switch (type)
@@ -339,12 +339,12 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                 observation_3d observation = new_objects[t][i];
                 state_3d new_state;
                 if (!observation.orientation_matrix.hasNaN())
-                    new_state.orientation_covar = observation.orientation_matrix;
+                    new_state.orientation_matrix = observation.orientation_matrix;
                 else
                 {
                     // Pointing upwards with little confidence
-                    new_state.orientation_covar = Eigen::Matrix3f::Identity() * 1e-10;
-                    new_state.orientation_covar(2, 2) = 0;
+                    new_state.orientation_matrix = Eigen::Matrix3f::Identity() * 1e-10;
+                    new_state.orientation_matrix(2, 2) = 0;
                 }
                 new_state.position = observation.position;
                 new_state.covariance = observation.covariance;

@@ -1,0 +1,92 @@
+#!/usr/bin/python3
+
+import rospy
+from nav_msgs.msg import Odometry, Path
+from geometry_msgs.msg import PoseStamped
+from tf2_ros import TransformListener, TransformBroadcaster, Buffer
+from tf.transformations import quaternion_multiply, quaternion_conjugate
+from geometry_msgs.msg import TransformStamped, Vector3, Quaternion
+import sys
+class OdomToPath:
+    def __init__(self):
+        self.path_pub = rospy.Publisher('path', Path, latch=True, queue_size=10)
+        self.odom_sub = rospy.Subscriber('/t265/odom/sample', Odometry, self.odom_cb, queue_size=10)
+        self.path = Path()
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer)
+        self.tf_broadcaster = TransformBroadcaster()
+        self.tf_msg = TransformStamped()
+
+    def odom_cb(self, msg):
+        cur_pose = PoseStamped()
+        cur_pose.header = msg.header
+        cur_pose.pose = msg.pose.pose
+        self.path.header = msg.header
+        self.path.poses.append(cur_pose)
+        self.path_pub.publish(self.path)
+
+
+        self.tf_msg.header.stamp = rospy.Time.now()
+        self.tf_msg.header.frame_id = "odom"
+        self.tf_msg.child_frame_id = "base_link"
+
+        odom_child_frame = msg.child_frame_id
+
+        # If the odometry sets the base_link pose directly,
+        # pass this to the TF directly
+        if odom_child_frame == "base_link":
+            self.tf_msg.transform.translation = msg.pose.pose.position
+            self.tf_msg.transform.rotation = msg.pose.pose.orientation
+            self.tf_broadcaster.sendTransform(self.tf_msg)
+            return
+
+        # Otherwise, calculate the required base_link transformation
+        # odom->child_frame = odom->base_link + base_link->child_frame
+        #   (Transform)        (Transform 1)        (Transform 2)
+        # So:
+        # odom->base_link = odom->child_frame - base_link->child_frame
+        #  (Transform 1)       (Transform)          (Transform 2)
+
+        try:
+            transform2 = self.tf_buffer.lookup_transform("base_link", odom_child_frame, rospy.Time())
+        except Exception as e:
+            print(e, file=sys.stderr)
+            # print(odom_child_frame, file=sys.stderr, flush=True)
+            return
+
+        trans2 = transform2.transform.translation
+        trans2 = [trans2.x, trans2.y, trans2.z]
+        rot2 = transform2.transform.rotation
+        rot2 = (rot2.x, rot2.y, rot2.z, rot2.w)
+
+        trans = msg.pose.pose.position
+        trans = [trans.x, trans.y, trans.z]
+        rot = msg.pose.pose.orientation
+        rot = (rot.x, rot.y, rot.z, rot.w)
+
+        # q = q1*q2
+        # So q1 = q * ~q2
+        rot1 = quaternion_multiply(rot, quaternion_conjugate(rot2))
+
+        # trans = trans1 + rotate(trans2, rot1)
+        # trans1 = trans - rotate(trans2, rot1)
+        # To rotate a vector v, with quaternion q:
+        # u' = q*u*~q, where u is [x, y, z, 0]
+        trans2_q = trans2 + [0] # Pure quaternion [x, y, z, 0]
+        trans2_q_rotated = quaternion_multiply(
+            rot1, quaternion_multiply(trans2_q, quaternion_conjugate(rot1)))
+        trans1 = [trans[i] - trans2_q_rotated[i] for i in range(3)]
+
+        self.tf_msg.transform.translation.x = trans1[0]
+        self.tf_msg.transform.translation.y = trans1[1]
+        self.tf_msg.transform.translation.z = trans1[2]
+        self.tf_msg.transform.rotation.w = rot1[3]
+        self.tf_msg.transform.rotation.x = rot1[0]
+        self.tf_msg.transform.rotation.y = rot1[1]
+        self.tf_msg.transform.rotation.z = rot1[2]
+        self.tf_broadcaster.sendTransform(self.tf_msg)
+
+if __name__ == '__main__':
+    rospy.init_node('odom_to_path')
+    odom_to_path = OdomToPath()
+    rospy.spin()

@@ -6,7 +6,7 @@ struct state_3d
     Eigen::Vector3f position;
     Eigen::Matrix3f covariance;
     Eigen::Matrix<float, 13, 1> distribution; // redundant for everything but hazmats
-    Eigen::Matrix3f orientation_covar;        // for calculating normals/cylinder axes
+    Eigen::Matrix3f orientation_matrix;       // for calculating normals/cylinder axes
     int miss_count = 0;
     int hit_count = 0;
     int id;             // unique ID for other objects

@@ -78,7 +78,6 @@ _________________________
 		</group>
 		<node pkg="tf" type="static_transform_publisher" name="t265_to_d400" args="0 0 0 0 0 0 /t265_link /d400_link 100"/>
         <node pkg="tf2_ros" type="static_transform_publisher" name="transform" args="0 0 0 0 0 0 /base_link /t265_odom_frame"/>
-		<node name="odometry_tf" pkg="object_detection" type="odometry_tf"/>
 	</group>
 
 	<group unless="$(eval rosbag_path == '')">
@@ -97,6 +96,7 @@ _________________________
 	</group>
 
 	<node name="detect" pkg="object_detection" type="detect3d" cwd="node" args="_gpu:=$(arg gpu)"/>
+	<node name="create_path" pkg="object_detection" type="odom_to_path" cwd="node"/>
 	<group if="$(arg rviz)">
 		<!-- <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/> -->
 		<node name="visualiser" pkg="rviz" type="rviz" args="-d $(find object_detection)/../../resources/settings.rviz" required="true"/>
