@@ -16,12 +16,13 @@
 #include <std_msgs/String.h>
 #include <numeric>
 #include <fstream>
-// To store camera properies e.g. focal length
+// to store camera properies e.g. focal length
 rs2_intrinsics intrinsics;
 
 // process at most 10 images per sec
 static constexpr double target_rate = 10.;
 
+// for detecting non-QR objects
 yolo_net net;
 QR_scanner scanner;
 tracker_t tracker;
@@ -30,15 +31,12 @@ image_transport::Publisher colour_pub;
 ros::Publisher vis_pub, text_pub;
 
 // Datatype to store the most recent 40 cpu percentages
-boost::circular_buffer<float> cpu_percentages(40), inference_times(40);
+boost::circular_buffer<float> inference_times(40);
 
 void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_msgs::ImageConstPtr &depth_img, const nav_msgs::OdometryConstPtr &odom)
 {
     // Limit the rate of inference 30 fps is probably un-necessary
     ros::Rate rate(target_rate);
-
-    // Get the CPU usage
-    cpu_percentages.push_back(cpu_monitor::getCurrentValue());
 
     // Convert images to opencv format
     cv::Mat frame = util::toCVMat(colour_img);
@@ -57,12 +55,14 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
     {
         // Do the detection of objects and QRs on 2 separate threads
         auto t0 = std::chrono::high_resolution_clock::now();
+        boost::timer::cpu_timer _timer;
+        _timer.start();
         std::thread t1(detect_qr);
         std::thread t2(detect_yolo);
         t1.join();
         t2.join();
-        std::chrono::duration<float> dt = std::chrono::high_resolution_clock::now() - t0;
-        inference_times.push_back(dt.count());
+        _timer.stop();
+        inference_times.push_back(_timer.elapsed().user * 1e-9f);
     }
     // Combine QRs and objects into one array
     auto output_2d = yolo_output;
@@ -94,7 +94,7 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
     visualization_msgs::MarkerArray markerarr;
     for (const auto &obj : tracked_objs)
     {
-        markerarr.markers.push_back(obj.get_object_marker());
+        markerarr.markers.push_back(obj.get_object_marker(camera_rotation));
         markerarr.markers.push_back(obj.get_covariance_marker());
         if (obj.type == object_type::QR)
             markerarr.markers.push_back(obj.get_QR_text_marker());
@@ -108,13 +108,12 @@ void camera_callback(const sensor_msgs::ImageConstPtr &colour_img, const sensor_
     };
 
     float average_inference_time = average(inference_times);
-    float average_cpu_percentage = average(cpu_percentages);
     constexpr static size_t buffsize = 200; // more than enough
     char buff[buffsize];
 
     // Create a string with the relevant information then publish the string
-    snprintf(buff, buffsize, "CPU: %5.0f%% | Inference %5.0f ms | Target rate: %.0f Hz",
-             average_cpu_percentage, 1000.f * average_inference_time, 1. / rate.expectedCycleTime().toSec());
+    snprintf(buff, buffsize, "Inference (user) time %5.0f ms | Target rate: %.0f Hz",
+             1000.f * average_inference_time, 1. / rate.expectedCycleTime().toSec());
     std_msgs::String text_msg;
     text_msg.data = buff;
 
@@ -198,5 +197,6 @@ int main(int argc, char **argv)
     // Publisher for the objects with bounding boxes
     image_transport::ImageTransport it(nh);
     colour_pub = it.advertise("camera/detections", 3);
+
     ros::spin();
 }

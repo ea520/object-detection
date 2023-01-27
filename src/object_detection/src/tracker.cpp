@@ -44,16 +44,16 @@ void state_3d::update(const observation_3d &new_obs)
     Eigen::Matrix3f gain = covariance * (covariance + new_obs.covariance).inverse();
     position += gain * (new_obs.position - position);
     covariance -= gain * covariance;
-    float old_weight = hit_count / (hit_count + 1.f);
 
     // For hazmats, update the probability distribution
     if (type == object_type::HAZMAT)
     {
+        float old_weight = hit_count / (hit_count + 1.f);
         distribution = distribution * old_weight + new_obs.distribution * (1.f - old_weight);
     }
+    if (!new_obs.orientation_matrix.hasNaN())
+        orientation_covar += new_obs.orientation_matrix;
 
-    // take the average of all the normals (THIS WON'T BE NORMALIZED)
-    normal = normal * old_weight + new_obs.normal * (1.f - old_weight);
     auto path = ros::package::getPath("object_detection") + "/detections.csv";
     std::ofstream output_file(path, std::ios_base::app);
     if (hit_count == min_detection_count())
@@ -66,18 +66,18 @@ void state_3d::update(const observation_3d &new_obs)
 
 // This quaternon rotates (1,0,0) to the normal "n"
 // Without initial rotation about the x axis
-Eigen::Quaternionf normal_to_quaternion(Eigen::Vector3f n)
+Eigen::Quaternionf normal_to_quaternion(Eigen::Vector3f n, Eigen::Vector3f start = Eigen::Vector3f::UnitX())
 {
     n.normalize();
-    auto axis = Eigen::Vector3f::UnitX().cross(n);
+    auto axis = start.cross(n);
     axis.normalize();
-    float theta = acosf(Eigen::Vector3f::UnitX().dot(n));
+    float theta = acosf(start.dot(n));
     Eigen::Quaternionf q(Eigen::AngleAxisf(theta, axis));
     return q;
 }
 
 // Very verbose  but it just produces the messages for rviz to render the objects
-visualization_msgs::Marker state_3d::get_object_marker() const
+visualization_msgs::Marker state_3d::get_object_marker(const Eigen::Quaternionf &camera_orientation) const
 {
     visualization_msgs::Marker marker;
     marker.header.frame_id = "odom";
@@ -87,6 +87,11 @@ visualization_msgs::Marker state_3d::get_object_marker() const
     marker.pose.position.y = position.y();
     marker.pose.position.z = position.z();
     marker.lifetime = ros::Duration(0.5);
+
+    Eigen::Vector3f camera_direction = camera_orientation * Eigen::Vector3f::UnitX();
+    auto normal = covar_to_orientation(orientation_covar);
+    if (camera_direction.dot(normal) > 0)
+        normal *= -1;
     switch (type)
     {
     case object_type::HAZMAT:
@@ -118,7 +123,7 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         std::string path = ros::package::getPath("object_detection") + "/../../resources/meshes/";
         marker.mesh_resource = "file://" + path + filenames[index];
         marker.mesh_use_embedded_materials = true;
-        marker.scale.x = marker.scale.y = marker.scale.z = .5;
+        marker.scale.x = marker.scale.y = marker.scale.z = .3;
         Eigen::Quaternionf q = normal_to_quaternion(normal);
         marker.pose.orientation.x = q.x();
         marker.pose.orientation.y = q.y();
@@ -142,9 +147,9 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.scale.y = 0.07;
         marker.scale.z = 0.07;
         marker.color.a = 1.;
-        marker.color.r = .8;
-        marker.color.g = .8;
-        marker.color.b = .8;
+        marker.color.r = .5;
+        marker.color.g = .5;
+        marker.color.b = .5;
     }
     break;
     case object_type::FIRE_EXTINGUISHER:
@@ -156,15 +161,13 @@ visualization_msgs::Marker state_3d::get_object_marker() const
         marker.mesh_resource = "file://" + path + "fire-extinguisher.dae";
         marker.mesh_use_embedded_materials = true;
         marker.scale.x = marker.scale.y = marker.scale.z = 0.01;
-        Eigen::Quaternionf q = normal_to_quaternion(normal);
-        // marker.pose.orientation.x = q.x();
-        // marker.pose.orientation.y = q.y();
-        // marker.pose.orientation.z = q.z();
-        // marker.pose.orientation.w = q.w();
-        marker.pose.orientation.x = 0;
-        marker.pose.orientation.y = 0;
-        marker.pose.orientation.z = 0;
-        marker.pose.orientation.w = 1;
+        if (normal.z() < 0) // Always point somewhat upwards
+            normal *= -1;
+        Eigen::Quaternionf q = normal_to_quaternion(normal, Eigen::Vector3f::UnitZ());
+        marker.pose.orientation.x = q.x();
+        marker.pose.orientation.y = q.y();
+        marker.pose.orientation.z = q.z();
+        marker.pose.orientation.w = q.w();
     }
     break;
     case object_type::DOOR:
@@ -335,7 +338,14 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                 static int ID;
                 observation_3d observation = new_objects[t][i];
                 state_3d new_state;
-                new_state.normal = observation.normal;
+                if (!observation.orientation_matrix.hasNaN())
+                    new_state.orientation_covar = observation.orientation_matrix;
+                else
+                {
+                    // Pointing upwards with little confidence
+                    new_state.orientation_covar = Eigen::Matrix3f::Identity() * 1e-10;
+                    new_state.orientation_covar(2, 2) = 0;
+                }
                 new_state.position = observation.position;
                 new_state.covariance = observation.covariance;
                 new_state.type = observation.type;

@@ -6,13 +6,13 @@ struct state_3d
     Eigen::Vector3f position;
     Eigen::Matrix3f covariance;
     Eigen::Matrix<float, 13, 1> distribution; // redundant for everything but hazmats
-    Eigen::Vector3f normal;                   // redundant for non-planar objects
+    Eigen::Matrix3f orientation_covar;        // for calculating normals/cylinder axes
     int miss_count = 0;
     int hit_count = 0;
     int id;             // unique ID for other objects
     std::string QR_txt; // QR code text
     void update(const observation_3d &new_obs);
-    visualization_msgs::Marker get_object_marker() const;
+    visualization_msgs::Marker get_object_marker(const Eigen::Quaternionf &camera_orientation) const;
     visualization_msgs::Marker get_covariance_marker() const;
     visualization_msgs::Marker get_QR_text_marker() const;
     friend std::ostream &operator<<(std::ostream &os, const state_3d &self);

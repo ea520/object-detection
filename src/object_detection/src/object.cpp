@@ -1,7 +1,9 @@
 #include "object.hpp"
 #include <opencv2/opencv.hpp>
 #include <librealsense2/rs.hpp>
-#include <Eigen/Geometry>
+#include <Eigen/Dense>
+
+// 22 distinct colours
 static const std::array<cv::Scalar, 22> colors = {
     cv::Scalar(230, 25, 75),
     cv::Scalar(60, 180, 75),
@@ -26,67 +28,6 @@ static const std::array<cv::Scalar, 22> colors = {
     cv::Scalar(255, 255, 255),
     cv::Scalar(0, 0, 0)};
 
-Eigen::Vector3f get_normal(std::vector<Eigen::Vector3f> points, float *mse = nullptr)
-{
-    // It is assumed the depth is on the z axis
-    // This then does least squares on the z error
-    // Fitting the data to the plane ax + by = z + d
-    // Subtracting the means from x,y and z  a<x> + b<y> = <z>
-    // a can be found with least squares
-    if (points.size() < 10)
-        throw std::runtime_error("Not enough points to calculate plane (need at least 10)");
-
-    // Reinterpret the data as an EIGEN matrix
-    typedef Eigen::Matrix<float, Eigen::Dynamic, 3, Eigen::RowMajor> Mat3x;
-    Mat3x mat = Eigen::Map<Mat3x>(&points[0][0], points.size(), 3);
-
-    // Subtract the average x value from each point's x coord etc.
-    mat.rowwise() -= mat.colwise().mean();
-
-    // Solve Ax = b for the least squares
-    // With good sampling, x and y would be independent so their covariance
-    // should be 0 making the matrix diagonal (trivial to invert)
-    // It turns out, just doing the inversion isn't much harder computationally
-    // and it allows for strange sampling of points
-    Eigen::Matrix2f A;
-    A(0, 0) = mat.col(0).dot(mat.col(0));
-    A(1, 0) = A(0, 1) = mat.col(0).dot(mat.col(1));
-    A(1, 1) = mat.col(1).dot(mat.col(1));
-    Eigen::Vector2f b{
-        mat.col(0).dot(mat.col(2)),
-        mat.col(1).dot(mat.col(2)),
-    };
-
-    Eigen::Vector3f n;
-    n(2) = -1.; // Normal points somewhat towards the camera
-    n.head<2>() = A.ldlt().solve(b);
-    auto errors = mat * n;
-    if (mse)
-        *mse = errors.dot(errors) / errors.rows();
-    return n.normalized();
-}
-
-Eigen::Vector3f get_axis(std::vector<Eigen::Vector3f> points)
-{
-    // Least squares fit for (nx,ny,nz) * (ax,-1,az) = 0 aka (nx,nz) * (ax,az) = ny
-    if (points.size() < 10)
-        throw std::runtime_error("Not enough points to calculate plane (need at least 10)");
-    typedef Eigen::Matrix<float, Eigen::Dynamic, 3, Eigen::RowMajor> Mat3x;
-    Mat3x mat = Eigen::Map<Mat3x>(&points[0][0], points.size(), 3);
-    Eigen::Matrix2f A;
-    A(0, 0) = mat.col(0).dot(mat.col(0));
-    A(1, 0) = A(0, 1) = mat.col(0).dot(mat.col(2));
-    A(1, 1) = mat.col(1).dot(mat.col(2));
-    Eigen::Vector2f b{
-        mat.col(0).dot(mat.col(1)),
-        mat.col(2).dot(mat.col(1)),
-    };
-    Eigen::Vector3f axis;
-    axis(1) = -1.; // Normal points somewhat towards the camera
-    axis.head<2>() = A.ldlt().solve(b);
-    return axis.normalized();
-}
-
 // Draw the bounding boxes to the image
 void draw_boxes(const std::vector<object2d> &detections, cv::Mat &frame)
 {
@@ -94,14 +35,14 @@ void draw_boxes(const std::vector<object2d> &detections, cv::Mat &frame)
     {
 
         const auto &detection = detections[i];
-        const cv::Point2i top_left{detection.u - detection.w / 2, detection.v - detection.w / 2};
-        const cv::Point2i bottom_right{detection.u + detection.w / 2, detection.v + detection.w / 2};
+        const cv::Point2i top_left{detection.u - detection.w / 2, detection.v - detection.h / 2};
+        const cv::Point2i bottom_right{detection.u + detection.w / 2, detection.v + detection.h / 2};
         const cv::Rect box{top_left, bottom_right};
-        auto classId = (std::hash<std::string>{}(detection.text) + (size_t)detection.type) % colors.size();
-        if (detection.text == "")
-            classId = rand();
-        const auto &color = colors[classId];
-        // Get a string for the confidence
+        // Objects of the same type and text should have the same colour. This hash function deterministically converts text to a number
+        size_t color_index = (std::hash<std::string>{}(detection.text) + (size_t)detection.type) % colors.size();
+        const auto &color = colors[color_index];
+
+        // Create a string for the confidence
         char buff[6] = "\0";
         if (detection.type != object_type::QR)
             snprintf(buff, sizeof(buff), " %.2f", detection.confidence);
@@ -109,31 +50,52 @@ void draw_boxes(const std::vector<object2d> &detections, cv::Mat &frame)
         // draw the bounding box
         cv::rectangle(frame, box, color, 3);
 
-        // Draw a filled box where the text will go
+        // Draw a filled box. The text will go over this
         cv::rectangle(frame, cv::Point(box.x, box.y - 10), cv::Point(box.x + box.width, box.y), color, cv::FILLED);
-        // Make the text collor dissimilar to the background colour
+
+        // Make the text colour dissimilar to the background colour
         cv::Scalar textcolor;
         textcolor[0] = color[0] < 128 ? 255 : 0;
         textcolor[1] = color[1] < 128 ? 255 : 0;
         textcolor[2] = color[2] < 128 ? 255 : 0;
+
         // Write the text
         cv::putText(frame, detection.text + buff, cv::Point(box.x, box.y), cv::FONT_HERSHEY_PLAIN, 1.0, textcolor);
     }
 }
 
-// For planar objects, how big can the average square error be for it to be considered a plane?
-float mse_tol(object_type type)
+Eigen::Matrix3f get_normal_matrix(std::vector<Eigen::Vector3f> normals)
 {
-    switch (type)
-    {
-    case object_type::HAZMAT:
-    case object_type::QR:
-        return 0.03 * 0.03;
-    case object_type::DOOR:
-        return 0.03 * 0.03;
-    default:
-        return INFINITY;
-    }
+    // This creates a covariance matrix
+    if (normals.size() < 10)
+        throw std::runtime_error("Not enough points to calculate plane (need at least 10)");
+
+    // Reinterpret the data as an EIGEN matrix
+    typedef Eigen::Matrix<float, Eigen::Dynamic, 3, Eigen::RowMajor> Mat3x;
+    Mat3x mat = Eigen::Map<Mat3x>(&normals[0][0], normals.size(), 3);
+    // Subtract the average x value from each point's x coord etc.
+    mat.rowwise() -= mat.colwise().mean();
+    return mat.transpose() * mat;
+}
+
+Eigen::Matrix3f get_axis_matrix(std::vector<Eigen::Vector3f> normals)
+{
+    if (normals.size() < 1)
+        throw std::runtime_error("Not enough points to calculate plane (need at least 1)");
+
+    // Reinterpret the data as an EIGEN matrix
+    typedef Eigen::Matrix<float, Eigen::Dynamic, 3, Eigen::RowMajor> Mat3x;
+    Mat3x mat = Eigen::Map<Mat3x>(&normals[0][0], normals.size(), 3);
+
+    return mat.transpose() * mat;
+}
+
+Eigen::Vector3f covar_to_orientation(const Eigen::Matrix3f &covar)
+{
+    Eigen::SelfAdjointEigenSolver<Eigen::Matrix3f> es(covar);
+    Eigen::Index idx;
+    es.eigenvalues().minCoeff(&idx); // sqrt of sum of square errors
+    return es.eigenvectors().col(idx);
 }
 
 // For horizontal objects, what angle to the horizontal is tolerable
@@ -199,49 +161,48 @@ std::vector<object2d_with_depth> get_2d_with_depths(const std::vector<object2d> 
             int height = 0.8 * detection.h;
             int u = det.u - width / 2;  // left
             int v = det.v - height / 2; // top
-            size_t iterations = 0;
             std::vector<Eigen::Vector3f> points = sample_depth_map(depth, u, v, width, height, N, intrinsics);
             if (points.size() == N)
             {
-                float mse;
-                det.normal = get_normal(points, &mse);
-                if (mse < mse_tol(det.type))
-                    ret.push_back(det);
+                det.orientation_matrix = get_normal_matrix(points);
+                ret.push_back(det);
             }
         }
         else if (det.type == object_type::FIRE_EXTINGUISHER)
         {
             // smaller bounding box;
-            int width = 0.2 * detection.w;
-            int height = 0.2 * detection.h;
+            int width = 0.3 * detection.w;
+            int height = 0.3 * detection.h;
             int u0 = det.u - width / 2;  // left
             int v0 = det.v - height / 2; // top
-            int w = width / 4;
-            int h = height / 4;
+            int w = width / 2;
+            int h = height / 2;
             static constexpr size_t N = 16 * 16;
             std::vector<Eigen::Vector3f> normals;
-            for (int i = 0; i < 4; i++)
-                for (int j = 0; j < 4; j++)
+            // Take 4 normals near the centre
+            // Find a matrix used to calculate the axis
+            for (int i = 0; i < 2; i++)
+                for (int j = 0; j < 2; j++)
                 {
                     int u = u0 + i * w;
                     int v = v0 + j * h;
                     std::vector<Eigen::Vector3f> points = sample_depth_map(depth, u, v, w, h, N, intrinsics);
-                    if (points.size() == N)
+                    if (points.size() > N / 2)
                     {
-                        normals.push_back(get_normal(points));
+                        normals.push_back(covar_to_orientation(get_normal_matrix(points)));
                     }
                 }
-            if (normals.size() > 10)
+            if (normals.size())
             {
-                det.normal = get_axis(normals);
+                det.orientation_matrix = get_axis_matrix(normals);
             }
             else
-                det.normal *= NAN;
+                det.orientation_matrix *= NAN;
             ret.push_back(det);
         }
         else if (det.type == object_type::PERSON)
         {
-            det.normal = Eigen::Vector3f::UnitZ();
+            det.orientation_matrix = Eigen::Matrix3f::Identity();
             ret.push_back(det);
         }
     }
@@ -314,10 +275,11 @@ std::vector<observation_3d> get_3d(const std::vector<object2d_with_depth> &detec
         // Find the corresponding point relative to a stationary reference frame
         obj.position = Q * (Q0 * pos_wrt_camera + t0) + camera_pose.translation;
 
-        // Rotate the normal with the new reference frame
-        obj.normal = Q * Q0 * det.normal;
+        auto M = (Q * Q0);
+        obj.orientation_matrix = M * det.orientation_matrix * M.transpose(); // really the axis not the covar
+
         // Find a rotation matrix that takes (1,0,0) to this normal
-        auto n = obj.normal.normalized();
+        Eigen::Vector3f n = covar_to_orientation(obj.orientation_matrix);
         auto axis = Eigen::Vector3f::UnitX().cross(n);
         axis.normalize();
         float theta = acosf(Eigen::Vector3f::UnitX().dot(n));
@@ -334,7 +296,7 @@ std::vector<observation_3d> get_3d(const std::vector<object2d_with_depth> &detec
         obj.confidence = det.confidence;
         obj.distribution = det.distribution;
 
-        if (fabs(obj.normal.z()) < angle_tol(det.type))
+        if (fabs(covar_to_orientation(obj.orientation_matrix).z()) < angle_tol(det.type))
             ret.push_back(obj);
     }
     return ret;
