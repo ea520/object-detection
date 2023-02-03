@@ -9,7 +9,7 @@ Panels:
         - /Odometry1/Covariance1
         - /OverlayImage1
       Splitter Ratio: 0.5170212984085083
-    Tree Height: 904
+    Tree Height: 441
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -67,7 +67,10 @@ Visualization Manager:
       Marker Topic: /visualization_marker
       Name: MarkerArray
       Namespaces:
-        {}
+        QR: true
+        QR-text: true
+        covariances: true
+        objects: true
       Queue Size: 100
       Value: true
     - Angle Tolerance: 0.10000000149011612
@@ -177,7 +180,7 @@ Visualization Manager:
       Pitch: 0
       Point towards: +x axis
       Position:
-        X: 0
+        X: -2.880000114440918
         Y: 0
         Z: 0
       Roll: 0

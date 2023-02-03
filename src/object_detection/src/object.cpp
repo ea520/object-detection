@@ -126,8 +126,8 @@ std::vector<Eigen::Vector3f> sample_depth_map(cv::Mat &depth, int u, int v, int 
     {
         int x = u + rand() % w;
         int y = v + rand() % h;
-        float dist = depth.at<uint16_t>(y, x) / 1000.;
-        if (dist < 0.1f)
+        float dist = depth.at<uint16_t>(y, x) / 1000.f;
+        if (dist < 0.1f || dist > 2.0f)
             continue;
         float positionsf[3];
         float coords[] = {(float)x, (float)y};

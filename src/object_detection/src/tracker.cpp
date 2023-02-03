@@ -144,8 +144,7 @@ visualization_msgs::Marker state_3d::get_object_marker(const Eigen::Quaternionf 
         marker.pose.orientation.w = q.w();
 
         marker.scale.x = 0.001;
-        marker.scale.y = 0.07;
-        marker.scale.z = 0.07;
+        marker.scale.y = marker.scale.z = 0.07;
         marker.color.a = 1.;
         marker.color.r = .5;
         marker.color.g = .5;
@@ -287,7 +286,7 @@ void tracker_t::update(const std::vector<observation_3d> &_new_obs)
                 distances(i, j) = objects[t][i].distance(new_objects[t][j]);
 
         // There is a very low probability of a false negative at this threshold (assuming noise model is correct)
-        constexpr float threshold = 21.0f;
+        constexpr float threshold = 9.0f;
 
         // Keep track of which previously known objects have been paired
         std::vector<bool> knowns_paired = std::vector<bool>(objects[t].size(), false);
